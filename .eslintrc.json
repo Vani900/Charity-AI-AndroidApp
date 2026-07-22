@@ -1,0 +1,29 @@
+{
+  "env": {
+    "es2021": true,
+    "node": true,
+    "browser": true
+  },
+  "extends": "eslint:recommended",
+  "parserOptions": {
+    "ecmaFeatures": {
+      "jsx": true
+    },
+    "ecmaVersion": "latest",
+    "sourceType": "module"
+  },
+  "globals": {
+    "__DEV__": "readonly",
+    "require": "readonly",
+    "module": "readonly",
+    "exports": "readonly",
+    "process": "readonly"
+  },
+  "rules": {
+    "no-unused-vars": "off",
+    "no-undef": "off",
+    "no-mixed-spaces-and-tabs": "off",
+    "no-inner-declarations": "off",
+    "no-empty": "off"
+  }
+}

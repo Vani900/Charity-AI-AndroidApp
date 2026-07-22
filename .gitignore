@@ -1,0 +1,26 @@
+# node_modules
+node_modules/
+
+# Expo build and cache
+.expo/
+dist/
+web-build/
+
+# Android build outputs
+android/build/
+android/app/build/
+android/.gradle/
+*.apk
+*.aar
+
+# iOS build outputs
+ios/build/
+
+# IDE files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
