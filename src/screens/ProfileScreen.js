@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator
+  TextInput, Alert, ActivityIndicator, Platform
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,11 +31,19 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', style: 'destructive', onPress: () => dispatch(logout()) },
-    ]);
+    if (Platform.OS === 'web') {
+      const confirm = window.confirm('Are you sure you want to logout?');
+      if (confirm) {
+        dispatch(logout());
+      }
+    } else {
+      Alert.alert('Logout', 'Are you sure you want to logout?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Logout', style: 'destructive', onPress: () => dispatch(logout()) },
+      ]);
+    }
   };
+
 
   const totalDonations = donations.length;
   const verifiedDonations = donations.filter((d) => d.status === 'verified').length;
