@@ -17,6 +17,7 @@ import ImpactDashboardScreen from '../screens/ImpactDashboardScreen';
 import EmergencyModeScreen from '../screens/EmergencyModeScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import NotificationCenterScreen from '../screens/NotificationCenterScreen';
+import DonationChatScreen from '../screens/DonationChatScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -28,6 +29,7 @@ function HomeStack() {
       <Stack.Screen name="DonationForm" component={DonationFormScreen} />
       <Stack.Screen name="DonationTracking" component={DonationTrackingScreen} />
       <Stack.Screen name="Notifications" component={NotificationCenterScreen} />
+      <Stack.Screen name="DonationChat" component={DonationChatScreen} />
     </Stack.Navigator>
   );
 }

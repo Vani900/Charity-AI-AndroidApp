@@ -153,6 +153,17 @@ export default function DonationTrackingScreen({ route, navigation }) {
             </View>
           </View>
         )}
+
+        {/* Contact/Chat Coordination Button */}
+        {donation && (
+          <TouchableOpacity
+            style={styles.chatBtn}
+            onPress={() => navigation.navigate('DonationChat', { donationId: donationId })}
+          >
+            <Ionicons name="chatbubbles-outline" size={20} color="#FFF" style={{ marginRight: 6 }} />
+            <Text style={styles.chatBtnText}>Open Donation Chat</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </ScrollView>
   );
@@ -211,4 +222,19 @@ const styles = StyleSheet.create({
   blockchainContent: { flex: 1 },
   blockchainTitle: { fontWeight: '700', color: Colors.primary, fontSize: Typography.fontSize.md },
   blockchainHash: { color: Colors.textSecondary, fontSize: Typography.fontSize.xs, fontFamily: 'monospace', marginTop: 2 },
+  chatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginTop: Spacing.lg,
+    ...Shadows.md,
+  },
+  chatBtnText: {
+    color: '#FFF',
+    fontWeight: '700',
+    fontSize: Typography.fontSize.md,
+  },
 });

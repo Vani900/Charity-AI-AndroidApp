@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ngosAPI, donationsAPI } from '../../services/api';
 import { Colors, Typography, Spacing, BorderRadius, Shadows, DonationTypeIcons, StatusColors } from '../../utils/theme';
 
-export default function DonationRequestsScreen() {
+export default function DonationRequestsScreen({ navigation }) {
   const [donations, setDonations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('pending');
@@ -134,6 +134,16 @@ export default function DonationRequestsScreen() {
           <Text style={{ color: Colors.success, fontWeight: '700' }}>📦 Confirm Delivery</Text>
         </TouchableOpacity>
       )}
+
+      {item.status !== 'pending' && item.status !== 'cancelled' && (
+        <TouchableOpacity
+          style={styles.chatBtn}
+          onPress={() => navigation.navigate('DonationChat', { donationId: item._id })}
+        >
+          <Ionicons name="chatbubbles-outline" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
+          <Text style={styles.chatBtnText}>Chat with Donor</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 
@@ -207,4 +217,18 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', padding: Spacing['2xl'] },
   emptyIcon: { fontSize: 64 },
   emptyText: { color: Colors.textSecondary, marginTop: Spacing.md, fontSize: Typography.fontSize.lg, fontWeight: '600' },
+  chatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+  chatBtnText: {
+    color: Colors.primary,
+    fontWeight: '700',
+  },
 });

@@ -4,6 +4,7 @@
 
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../utils/theme';
 
@@ -12,8 +13,19 @@ import RequirementManagementScreen from '../screens/ngo/RequirementManagementScr
 import DonationRequestsScreen from '../screens/ngo/DonationRequestsScreen';
 import NGOAnalyticsScreen from '../screens/ngo/NGOAnalyticsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import DonationChatScreen from '../screens/DonationChatScreen';
 
 const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
+
+function RequestsStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="RequestsMain" component={DonationRequestsScreen} />
+      <Stack.Screen name="DonationChat" component={DonationChatScreen} />
+    </Stack.Navigator>
+  );
+}
 
 export default function NGONavigator() {
   return (
@@ -37,7 +49,7 @@ export default function NGONavigator() {
     >
       <Tab.Screen name="Dashboard" component={NGODashboardScreen} />
       <Tab.Screen name="Requirements" component={RequirementManagementScreen} />
-      <Tab.Screen name="Requests" component={DonationRequestsScreen} />
+      <Tab.Screen name="Requests" component={RequestsStack} />
       <Tab.Screen name="Analytics" component={NGOAnalyticsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
