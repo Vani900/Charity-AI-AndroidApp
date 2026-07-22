@@ -148,7 +148,7 @@ export default function DonationTrackingScreen({ route, navigation }) {
           <View style={styles.blockchainCard}>
             <Ionicons name="shield-checkmark" size={24} color={Colors.primary} />
             <View style={styles.blockchainContent}>
-              <Text style={styles.blockchainTitle}>Blockchain Verified ⛓️</Text>
+              <Text style={styles.blockchainTitle}>Backend-Generated Transparency Hash ⛓️</Text>
               <Text style={styles.blockchainHash} numberOfLines={1}>{donation.blockchainTxHash}</Text>
             </View>
           </View>

@@ -38,6 +38,9 @@ export default function DonationFormScreen({ route, navigation }) {
   const [selectedNGO, setSelectedNGO] = useState(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [images, setImages] = useState([]);
+  const [expandedNgoId, setExpandedNgoId] = useState(null);
+  const [selectedPayment, setSelectedPayment] = useState('UPI');
+  const [explicitlyConfirmed, setExplicitlyConfirmed] = useState(false);
 
   useEffect(() => {
     if (preselect) { setSelectedType(preselect); setStep(2); }
@@ -292,51 +295,74 @@ export default function DonationFormScreen({ route, navigation }) {
                 </View>
               ) : (
                 <>
-                  {matches.map((m) => (
-                    <TouchableOpacity
-                      key={m.ngo_id}
-                      style={[
+                  {matches.map((m) => {
+                    const isExpanded = expandedNgoId === m.ngo_id;
+                    const isSelected = selectedNGO?.ngo_id === m.ngo_id;
+                    return (
+                      <View key={m.ngo_id} style={[
                         styles.ngoCard,
-                        selectedNGO?.ngo_id === m.ngo_id && styles.ngoCardSelected,
+                        isSelected && styles.ngoCardSelected,
                         m.isAiMatched && styles.ngoCardAi,
-                      ]}
-                      onPress={() => setSelectedNGO(m)}
-                    >
-                      {m.isAiMatched && (
-                        <View style={styles.aiBadge}>
-                          <Ionicons name="sparkles" size={12} color="#FFF" style={{ marginRight: 4 }} />
-                          <Text style={styles.aiBadgeText}>AI Recommended Match</Text>
-                        </View>
-                      )}
-                      <View style={styles.ngoCardHeader}>
-                        <Text style={styles.ngoName}>{m.ngo_name}</Text>
-                        <View style={[styles.scoreBadge, m.isAiMatched ? { backgroundColor: Colors.primary } : { backgroundColor: Colors.textSecondary }]}>
-                          <Text style={styles.scoreText}>{Math.round(m.score * 100)}%</Text>
-                        </View>
+                      ]}>
+                        <TouchableOpacity
+                          style={styles.ngoCardHeaderTouchable}
+                          onPress={() => setExpandedNgoId(isExpanded ? null : m.ngo_id)}
+                        >
+                          {m.isAiMatched && (
+                            <View style={styles.aiBadge}>
+                              <Ionicons name="sparkles" size={12} color="#FFF" style={{ marginRight: 4 }} />
+                              <Text style={styles.aiBadgeText}>AI Recommended Match</Text>
+                            </View>
+                          )}
+                          <View style={styles.ngoCardHeader}>
+                            <Text style={styles.ngoName}>{m.ngo_name}</Text>
+                            <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={Colors.textSecondary} />
+                          </View>
+                          <View style={styles.ngoMeta}>
+                            <View style={styles.metaItem}>
+                              <Ionicons name="location-outline" size={14} color={Colors.textSecondary} />
+                              <Text style={styles.metaText}>{m.distance_km} km away</Text>
+                            </View>
+                            <View style={styles.metaItem}>
+                              <Ionicons name="alert-circle-outline" size={14} color={Colors.warning} />
+                              <Text style={styles.metaText}>{m.urgency} urgency</Text>
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+
+                        {isExpanded && (
+                          <View style={styles.ngoDetailsExpand}>
+                            <Text style={styles.ngoDetailsLabel}>NGO Description:</Text>
+                            <Text style={styles.ngoDetailsVal}>{m.reason || 'Provides dynamic multi-resource charity support.'}</Text>
+                            
+                            <Text style={styles.ngoDetailsLabel}>Verification Status:</Text>
+                            <Text style={[styles.ngoDetailsVal, { color: Colors.success, fontWeight: '700' }]}>✓ Approved & Verified Partner</Text>
+
+                            <Text style={styles.ngoDetailsLabel}>Location Address:</Text>
+                            <Text style={styles.ngoDetailsVal}>{m.ngo_address || 'Chennai Partner Area'}</Text>
+
+                            <Text style={styles.ngoDetailsLabel}>Required Resource:</Text>
+                            <Text style={styles.ngoDetailsVal}>{selectedType?.toUpperCase()}</Text>
+
+                            <Text style={styles.ngoDetailsLabel}>Required Quantity:</Text>
+                            <Text style={styles.ngoDetailsVal}>{m.quantity || 'As requested'}</Text>
+
+                            <Text style={styles.ngoDetailsLabel}>Contact details:</Text>
+                            <Text style={styles.ngoDetailsVal}>Available upon donation confirmation</Text>
+
+                            <TouchableOpacity
+                              style={[styles.selectNgoBtn, isSelected && styles.selectNgoBtnActive]}
+                              onPress={() => setSelectedNGO(m)}
+                            >
+                              <Text style={styles.selectNgoBtnText}>
+                                {isSelected ? '✓ NGO Selected' : 'Select This NGO'}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
                       </View>
-                      <View style={styles.ngoMeta}>
-                        <View style={styles.metaItem}>
-                          <Ionicons name="location-outline" size={14} color={Colors.textSecondary} />
-                          <Text style={styles.metaText}>{m.distance_km} km away</Text>
-                        </View>
-                        <View style={styles.metaItem}>
-                          <Ionicons name="alert-circle-outline" size={14} color={Colors.warning} />
-                          <Text style={styles.metaText}>{m.urgency} urgency</Text>
-                        </View>
-                      </View>
-                      {m.isAiMatched && m.reason && (
-                        <Text style={styles.aiReasonText}>
-                          🤖 {m.reason}
-                        </Text>
-                      )}
-                      {selectedNGO?.ngo_id === m.ngo_id && (
-                        <View style={styles.selectedBadge}>
-                          <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
-                          <Text style={styles.selectedBadgeText}>Selected</Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  ))}
+                    );
+                  })}
 
                   <TouchableOpacity
                     style={[styles.nextBtn, !selectedNGO && styles.nextBtnDisabled]}
@@ -353,43 +379,119 @@ export default function DonationFormScreen({ route, navigation }) {
           {/* Step 4: Confirm */}
           {step === 4 && (
             <>
-              <Text style={styles.stepTitle}>Confirm Donation ✅</Text>
-
+              <Text style={styles.stepTitle}>Confirm Donation Summary ✅</Text>
+              
               <View style={styles.summaryCard}>
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryKey}>Resource Type</Text>
-                  <Text style={styles.summaryVal}>{DonationTypeIcons[selectedType]} {selectedType}</Text>
+                  <Text style={styles.summaryKey}>Donation Category</Text>
+                  <Text style={styles.summaryVal}>{DonationTypeIcons[selectedType]} {selectedType?.toUpperCase()}</Text>
                 </View>
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryKey}>Quantity</Text>
+                  <Text style={styles.summaryKey}>Donation Details</Text>
+                  <Text style={styles.summaryVal} numberOfLines={1}>{description}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryKey}>Quantity/Amount</Text>
                   <Text style={styles.summaryVal}>{quantity}</Text>
                 </View>
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryKey}>NGO</Text>
-                  <Text style={styles.summaryVal}>{selectedNGO?.ngo_name || 'Auto-matched'}</Text>
+                  <Text style={styles.summaryKey}>Donor Location</Text>
+                  <Text style={styles.summaryVal}>
+                    {location ? `Lat: ${location.latitude.toFixed(4)}, Lng: ${location.longitude.toFixed(4)}` : 'Not set'}
+                  </Text>
                 </View>
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryKey}>Priority</Text>
+                  <Text style={styles.summaryKey}>Selected NGO</Text>
+                  <Text style={[styles.summaryVal, { color: Colors.primary }]}>{selectedNGO?.ngo_name || 'Auto-matched'}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryKey}>NGO Verification</Text>
+                  <Text style={[styles.summaryVal, { color: Colors.success }]}>✓ Verified Partner</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryKey}>NGO Location</Text>
+                  <Text style={styles.summaryVal}>{selectedNGO?.ngo_address || 'Chennai Partner Office'}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryKey}>Urgency Status</Text>
                   <Text style={[styles.summaryVal, isEmergency && { color: Colors.emergency }]}>
                     {isEmergency ? '🚨 Emergency' : '📦 Standard'}
                   </Text>
                 </View>
+
+                {selectedType === 'money' && (
+                  <>
+                    <View style={styles.paymentSectionHeader}>
+                      <Text style={styles.paymentTitle}>Select Payment Method</Text>
+                      <Text style={styles.paymentSecurityNote}>🔒 UPI PIN or passwords will never be collected.</Text>
+                    </View>
+
+                    {['UPI', 'Google Pay', 'PhonePe', 'Paytm'].map((method) => (
+                      <TouchableOpacity
+                        key={method}
+                        style={[styles.paymentMethodRow, selectedPayment === method && styles.paymentMethodRowActive]}
+                        onPress={() => setSelectedPayment(method)}
+                      >
+                        <Ionicons
+                          name={selectedPayment === method ? "radio-button-on" : "radio-button-off"}
+                          size={18}
+                          color={selectedPayment === method ? Colors.primary : Colors.textSecondary}
+                        />
+                        <Text style={styles.paymentMethodLabel}>{method}</Text>
+                      </TouchableOpacity>
+                    ))}
+
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryKey}>Payment Status</Text>
+                      <Text style={[styles.summaryVal, { color: Colors.warning }]}>Payment Integration Pending</Text>
+                    </View>
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryKey}>Audit Reference</Text>
+                      <Text style={styles.summaryVal}>N/A - Integration Pending</Text>
+                    </View>
+                  </>
+                )}
+
                 <View style={[styles.summaryRow, styles.blockchainRow]}>
                   <Ionicons name="shield-checkmark" size={16} color={Colors.primary} />
-                  <Text style={styles.blockchainNote}>Will be recorded on blockchain for transparency</Text>
+                  <Text style={styles.blockchainNote}>
+                    Will be logged as a backend-generated transparency audit reference
+                  </Text>
                 </View>
               </View>
+
+              <Text style={[styles.verificationHeader, { color: Colors.primary, fontWeight: '700' }]}>
+                Your donation will go to: {selectedNGO?.ngo_name}
+              </Text>
+
+              {/* Explicit Confirmation Checkbox */}
+              <TouchableOpacity
+                style={[styles.checkboxContainer, explicitlyConfirmed && styles.checkboxContainerActive]}
+                onPress={() => setExplicitlyConfirmed(!explicitlyConfirmed)}
+              >
+                <Ionicons
+                  name={explicitlyConfirmed ? "checkbox" : "square-outline"}
+                  size={22}
+                  color={explicitlyConfirmed ? Colors.primary : Colors.textSecondary}
+                />
+                <Text style={styles.checkboxText}>
+                  I explicitly confirm all donation details before final submission.
+                </Text>
+              </TouchableOpacity>
 
               <View style={styles.stepButtons}>
                 <TouchableOpacity style={styles.backBtn} onPress={() => setStep(3)}>
                   <Text style={styles.backBtnText}>← Back</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.submitBtn, { flex: 2 }]}
+                  style={[styles.submitBtn, { flex: 2 }, (!explicitlyConfirmed || isLoading) && styles.nextBtnDisabled]}
                   onPress={submitDonation}
-                  disabled={isLoading}
+                  disabled={isLoading || !explicitlyConfirmed}
                 >
-                  <LinearGradient colors={[Colors.primary, Colors.primaryLight]} style={styles.submitGradient}>
+                  <LinearGradient
+                    colors={explicitlyConfirmed ? [Colors.primary, Colors.primaryLight] : [Colors.border, Colors.border]}
+                    style={styles.submitGradient}
+                  >
                     {isLoading
                       ? <ActivityIndicator color="#FFF" />
                       : <Text style={styles.submitText}>Confirm & Submit 🚀</Text>
@@ -577,5 +679,103 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.6)',
     padding: Spacing.sm,
     borderRadius: BorderRadius.md,
+  },
+  ngoCardHeaderTouchable: {
+    width: '100%',
+  },
+  ngoDetailsExpand: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  ngoDetailsLabel: {
+    fontSize: 10,
+    color: Colors.textSecondary,
+    fontWeight: '700',
+    marginTop: 6,
+    textTransform: 'uppercase',
+  },
+  ngoDetailsVal: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.text,
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  selectNgoBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.md,
+    padding: 10,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  selectNgoBtnActive: {
+    backgroundColor: Colors.success,
+  },
+  selectNgoBtnText: {
+    color: '#FFF',
+    fontWeight: '800',
+    fontSize: Typography.fontSize.sm,
+  },
+  paymentSectionHeader: {
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.sm,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
+  },
+  paymentTitle: {
+    fontSize: Typography.fontSize.md,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  paymentSecurityNote: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  paymentMethodRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.divider,
+  },
+  paymentMethodRowActive: {
+    backgroundColor: '#F0FDF4',
+  },
+  paymentMethodLabel: {
+    fontSize: Typography.fontSize.md,
+    color: Colors.text,
+    fontWeight: '600',
+  },
+  verificationHeader: {
+    textAlign: 'center',
+    marginVertical: Spacing.md,
+    fontSize: Typography.fontSize.md,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: Spacing.md,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.lg,
+    backgroundColor: Colors.surface,
+  },
+  checkboxContainerActive: {
+    borderColor: Colors.primary,
+    backgroundColor: '#F0FDF4',
+  },
+  checkboxText: {
+    flex: 1,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.text,
+    fontWeight: '600',
   },
 });

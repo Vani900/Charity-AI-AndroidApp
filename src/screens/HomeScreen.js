@@ -183,14 +183,27 @@ export default function HomeScreen({ navigation }) {
               onPress={() => navigation.navigate('DonationTracking', { donationId: d._id })}
             >
               <View style={styles.donationLeft}>
-                <Text style={styles.donationIcon}>{DonationTypeIcons[d.category]}</Text>
-                <View>
-                  <Text style={styles.donationType}>{d.category?.toUpperCase()}</Text>
-                  <Text style={styles.donationQty}>{d.quantity}</Text>
+                <Text style={styles.donationIcon}>{DonationTypeIcons[d.category] || '🎁'}</Text>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.donationType}>{d.category?.toUpperCase()}</Text>
+                    <Text style={styles.donationId}>#{d._id?.slice(-6).toUpperCase()}</Text>
+                  </View>
+                  <Text style={styles.donationQty}>Qty: {d.quantity}</Text>
+                  <Text style={styles.donationNgo}>To: {d.assignedNgoId?.name || 'Auto-matched NGO Partner'}</Text>
+                  <Text style={styles.donationDate}>Date: {new Date(d.createdAt || Date.now()).toLocaleDateString()}</Text>
+                  
+                  {d.category === 'money' && (
+                    <Text style={styles.donationPayment}>Payment: Integration Pending</Text>
+                  )}
+                  
+                  <Text style={styles.donationAudit}>
+                    Audit Ref: {d.blockchainTxHash ? d.blockchainTxHash.slice(0, 12) + '...' : 'Integration Pending'}
+                  </Text>
                 </View>
               </View>
-              <View style={[styles.statusBadge, { backgroundColor: StatusColors[d.status] + '20' }]}>
-                <Text style={[styles.statusText, { color: StatusColors[d.status] }]}>{d.status}</Text>
+              <View style={[styles.statusBadge, { backgroundColor: StatusColors[d.status] + '20', alignSelf: 'flex-start' }]}>
+                <Text style={[styles.statusText, { color: StatusColors[d.status] }]}>{d.status?.replace('_', ' ')}</Text>
               </View>
             </TouchableOpacity>
           ))
@@ -253,7 +266,12 @@ const styles = StyleSheet.create({
   donationLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   donationIcon: { fontSize: 32 },
   donationType: { fontWeight: '700', color: Colors.text, fontSize: Typography.fontSize.sm },
-  donationQty: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, marginTop: 2 },
+  donationId: { fontSize: 11, color: Colors.textSecondary, backgroundColor: '#F1F5F9', paddingHorizontal: 4, borderRadius: 3, fontWeight: '700' },
+  donationQty: { color: Colors.textSecondary, fontSize: Typography.fontSize.xs, marginTop: 2, fontWeight: '500' },
+  donationNgo: { color: Colors.textSecondary, fontSize: Typography.fontSize.xs, marginTop: 1, fontWeight: '500' },
+  donationDate: { color: Colors.textLight, fontSize: 10, marginTop: 1 },
+  donationPayment: { color: Colors.warning, fontSize: 10, fontWeight: '700', marginTop: 1 },
+  donationAudit: { color: Colors.primary, fontSize: 10, marginTop: 2, fontFamily: 'monospace', fontWeight: '600' },
   statusBadge: { paddingHorizontal: Spacing.sm, paddingVertical: 4, borderRadius: BorderRadius.full },
   statusText: { fontSize: Typography.fontSize.xs, fontWeight: '700' },
 });
