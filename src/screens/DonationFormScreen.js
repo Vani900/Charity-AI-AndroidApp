@@ -10,7 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useDispatch, useSelector } from 'react-redux';
-import { createDonation, fetchMatches, clearCreateSuccess } from '../redux/slices/donationSlice';
+import { createDonation, fetchMatches, clearCreateSuccess, clearDonationError } from '../redux/slices/donationSlice';
 import { Colors, Typography, Spacing, BorderRadius, Shadows, DonationTypeIcons } from '../utils/theme';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
@@ -54,6 +54,13 @@ export default function DonationFormScreen({ route, navigation }) {
       ]);
     }
   }, [createSuccess]);
+
+  useEffect(() => {
+    if (error) {
+      Alert.alert('Submission Failed ❌', error);
+      dispatch(clearDonationError());
+    }
+  }, [error]);
 
   const getLocation = async () => {
     setLoadingLocation(true);

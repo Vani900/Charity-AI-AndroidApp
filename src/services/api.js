@@ -63,10 +63,7 @@ export const authAPI = {
 
 // ── Donations ─────────────────────────────────────────────────────────────────
 export const donationsAPI = {
-  create: (formData) =>
-    api.post('/donations/donations', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
+  create: (formData) => api.post('/donations/donations', formData),
   getAll: (params) => api.get('/donations/my-history', { params }),
   getById: (id) => api.get(`/donations/${id}/tracking`),
   getTracking: (id) => api.get(`/donations/${id}/tracking`),
@@ -79,10 +76,7 @@ export const ngosAPI = {
   getRequests: () => api.get('/ngo/requirements'),
   updateStatus: (id, status, note, longitude, latitude) =>
     api.put(`/ngo/donations/${id}/status`, { status, note, longitude, latitude }),
-  uploadDocs: (formData) =>
-    api.post('/ngo/upload-docs', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
+  uploadDocs: (formData) => api.post('/ngo/upload-docs', formData),
 };
 
 // ── Matching ──────────────────────────────────────────────────────────────────
