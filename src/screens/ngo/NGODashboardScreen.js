@@ -16,10 +16,12 @@ export default function NGODashboardScreen({ navigation }) {
   const { user } = useSelector((s) => s.auth);
   const [ngo, setNgo] = useState(null);
   const [stats, setStats] = useState([]);
+  const [donations, setDonations] = useState([]);
   const [requirements, setRequirements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [updatingId, setUpdatingId] = useState(null);
 
   useEffect(() => { loadData(); }, []);
 
@@ -31,9 +33,22 @@ export default function NGODashboardScreen({ navigation }) {
         ngosAPI.getDashboard(),
         ngosAPI.getRequirements(),
       ]);
-      setNgo(profileRes.data?.data || null);
-      setStats(dashRes.data?.data?.stats || []);
+      const currentNgo = profileRes.data?.data || null;
+      setNgo(currentNgo);
+      setDonations(dashRes.data?.data?.requests || []);
       setRequirements(reqsRes.data?.data || reqsRes.data || []);
+
+      const fetchedStats = [...(dashRes.data?.data?.stats || [])];
+      const requirementsCount = (reqsRes.data?.data || reqsRes.data || []).length;
+      if (fetchedStats.length >= 3) {
+        fetchedStats.push({
+          v: requirementsCount.toString(),
+          l: 'Active Requirements',
+          color: '#8B5CF6',
+          bg: 'rgba(139, 92, 246, 0.15)',
+        });
+      }
+      setStats(fetchedStats);
     } catch (e) {
       console.warn('Failed to load NGO dashboard:', e.message);
       setError('Failed to refresh data from server.');
@@ -42,7 +57,36 @@ export default function NGODashboardScreen({ navigation }) {
     }
   };
 
-  const isNgoVerified = true;
+  const handleUpdateStatus = async (id, status) => {
+    setUpdatingId(id);
+    try {
+      await ngosAPI.updateStatus(id, status, `Status changed via mobile dashboard overview.`);
+      Alert.alert('Success ✅', `Request status updated to ${status}.`);
+      loadData();
+    } catch (e) {
+      console.warn('Failed to update request:', e.message);
+      Alert.alert('Error', e.response?.data?.message || 'Failed to update donation request.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const viewRequestDetails = (d) => {
+    Alert.alert(
+      `${d.category?.toUpperCase()} Donation Details`,
+      `Quantity: ${d.quantity}\nDonor: ${d.donorId?.name || 'Anonymous'}\nPhone: ${d.donorId?.phone || 'Private'}\nDescription: ${d.description || 'No description provided.'}\nStatus: ${d.status}`,
+      [{ text: 'Close', style: 'cancel' }]
+    );
+  };
+
+  const isNgoVerified = true; // Permitted actions per backend schema access
+  const approvalStatus = ngo?.approvalStatus || 'pending';
+
+  const getStatusColor = () => {
+    if (approvalStatus === 'approved') return '#10B981';
+    if (approvalStatus === 'rejected') return '#EF4444';
+    return '#F59E0B';
+  };
 
   if (loading) return <View style={styles.loading}><ActivityIndicator size="large" color={Colors.primary} /></View>;
 
@@ -51,8 +95,8 @@ export default function NGODashboardScreen({ navigation }) {
       <LinearGradient colors={[Colors.primaryDark, Colors.primary]} style={styles.header}>
         <Text style={styles.welcome}>Welcome back,</Text>
         <Text style={styles.ngoName}>{ngo?.name || 'NGO'} 🏢</Text>
-        <View style={[styles.statusBadge, { backgroundColor: '#10B981' }]}>
-          <Text style={styles.statusBadgeText}>APPROVED</Text>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor() }]}>
+          <Text style={styles.statusBadgeText}>{approvalStatus.toUpperCase()}</Text>
         </View>
         <View style={styles.statsRow}>
           {stats.map((s, i) => (
@@ -65,6 +109,25 @@ export default function NGODashboardScreen({ navigation }) {
       </LinearGradient>
 
       <View style={styles.content}>
+        {approvalStatus === 'pending' && (
+          <View style={styles.pendingBanner}>
+            <Ionicons name="time-outline" size={24} color={Colors.warning} />
+            <View style={styles.pendingText}>
+              <Text style={styles.pendingTitle}>Verification Pending</Text>
+              <Text style={styles.pendingSub}>Your NGO registration is currently pending admin verification. Standard public search features will unlock once approved.</Text>
+            </View>
+          </View>
+        )}
+
+        {approvalStatus === 'rejected' && (
+          <View style={[styles.pendingBanner, { backgroundColor: '#FEE2E2', borderLeftColor: '#EF4444' }]}>
+            <Ionicons name="close-circle-outline" size={24} color="#EF4444" />
+            <View style={styles.pendingText}>
+              <Text style={[styles.pendingTitle, { color: '#EF4444' }]}>Verification Rejected</Text>
+              <Text style={styles.pendingSub}>Your NGO registration has been rejected. Please review profile details or contact support.</Text>
+            </View>
+          </View>
+        )}
 
         {error && (
           <View style={styles.errorBanner}>
@@ -77,14 +140,8 @@ export default function NGODashboardScreen({ navigation }) {
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Active Resource Requirements</Text>
           <TouchableOpacity 
-            style={[styles.createBtn, !isNgoVerified && styles.disabledBtn]} 
-            onPress={() => {
-              if (!isNgoVerified) {
-                Alert.alert('Verification Pending', 'You will be able to create requirements once your NGO is approved by the admin.');
-                return;
-              }
-              navigation.navigate('Requirements');
-            }}
+            style={styles.createBtn} 
+            onPress={() => navigation.navigate('Requirements')}
           >
             <Ionicons name="add-circle-outline" size={16} color="#FFF" />
             <Text style={styles.createBtnText}>Create</Text>
@@ -95,11 +152,9 @@ export default function NGODashboardScreen({ navigation }) {
           <View style={styles.empty}>
             <Text style={styles.emptyIcon}>📋</Text>
             <Text style={styles.emptyText}>No active requirements yet</Text>
-            {isNgoVerified && (
-              <TouchableOpacity style={styles.emptyCreateBtn} onPress={() => navigation.navigate('Requirements')}>
-                <Text style={styles.emptyCreateBtnText}>Create Requirement</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity style={styles.emptyCreateBtn} onPress={() => navigation.navigate('Requirements')}>
+              <Text style={styles.emptyCreateBtnText}>Create Requirement</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           requirements.map((r) => (
@@ -123,6 +178,49 @@ export default function NGODashboardScreen({ navigation }) {
                   <Text style={styles.detailsText}><Text style={styles.detailsLabel}>Required Date:</Text> {new Date(r.needByDate).toLocaleDateString()}</Text>
                 )}
                 <Text style={styles.detailsText}><Text style={styles.detailsLabel}>Status:</Text> <Text style={styles.statusText}>{r.status || 'open'}</Text></Text>
+              </View>
+            </View>
+          ))
+        )}
+
+        {/* Donation Requests */}
+        <Text style={[styles.sectionTitle, { marginTop: Spacing.xl, marginBottom: Spacing.md }]}>Donation Requests</Text>
+        {donations.length === 0 ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyIcon}>🎁</Text>
+            <Text style={styles.emptyText}>No donation requests available</Text>
+          </View>
+        ) : (
+          donations.map((d) => (
+            <View key={d._id} style={styles.donationCard}>
+              <View style={styles.donTopRow}>
+                <Text style={styles.donEmoji}>{DonationTypeIcons[d.category] || '🎁'}</Text>
+                <View style={styles.donInfo}>
+                  <Text style={styles.donTitle}>{(d.category || 'Donation')?.toUpperCase()} – {d.quantity}</Text>
+                  <Text style={styles.donDonor}>Donor: {d.donorId?.name || 'Anonymous'}</Text>
+                  {d.donorId?.phone && <Text style={styles.donPhone}>📞 {d.donorId.phone}</Text>}
+                  <Text style={styles.donDate}>{d.createdAt ? new Date(d.createdAt).toLocaleDateString() : 'Recent'}</Text>
+                </View>
+              </View>
+
+              <View style={styles.donActions}>
+                <TouchableOpacity style={styles.detailsBtn} onPress={() => viewRequestDetails(d)}>
+                  <Text style={styles.detailsBtnText}>View Details</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.actionBtn, styles.acceptBtn]} 
+                  onPress={() => handleUpdateStatus(d._id, 'accepted')}
+                  disabled={updatingId === d._id}
+                >
+                  {updatingId === d._id ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.acceptBtnText}>Accept</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.actionBtn, styles.rejectBtn]} 
+                  onPress={() => handleUpdateStatus(d._id, 'cancelled')}
+                  disabled={updatingId === d._id}
+                >
+                  {updatingId === d._id ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.rejectBtnText}>Reject</Text>}
+                </TouchableOpacity>
               </View>
             </View>
           ))
@@ -160,7 +258,6 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
   sectionTitle: { fontSize: Typography.fontSize.lg, fontWeight: '700', color: Colors.text },
   createBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: BorderRadius.md },
-  disabledBtn: { backgroundColor: Colors.border, opacity: 0.6 },
   createBtnText: { color: '#FFF', fontWeight: '700', fontSize: Typography.fontSize.sm },
   empty: { alignItems: 'center', padding: Spacing.xl, backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, ...Shadows.sm },
   emptyIcon: { fontSize: 48 },
@@ -181,4 +278,20 @@ const styles = StyleSheet.create({
   statusText: { textTransform: 'capitalize', color: Colors.primary, fontWeight: '700' },
   activityBox: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, padding: Spacing.md, borderRadius: BorderRadius.lg, ...Shadows.sm },
   activityText: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, flex: 1 },
+  donationCard: { backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, padding: Spacing.md, marginBottom: Spacing.sm, ...Shadows.sm },
+  donTopRow: { flexDirection: 'row', gap: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border, paddingBottom: Spacing.sm },
+  donEmoji: { fontSize: 36 },
+  donInfo: { flex: 1 },
+  donTitle: { fontWeight: '700', color: Colors.text, fontSize: Typography.fontSize.md },
+  donDonor: { fontSize: Typography.fontSize.sm, color: Colors.text, marginTop: 2 },
+  donPhone: { fontSize: Typography.fontSize.xs, color: Colors.textSecondary, marginTop: 1 },
+  donDate: { fontSize: Typography.fontSize.xs, color: Colors.textSecondary, marginTop: 2 },
+  donActions: { flexDirection: 'row', gap: Spacing.sm, paddingTop: Spacing.sm, justifyContent: 'flex-end' },
+  actionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: BorderRadius.md },
+  detailsBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: BorderRadius.md, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
+  detailsBtnText: { color: Colors.text, fontWeight: '600', fontSize: Typography.fontSize.xs },
+  acceptBtn: { backgroundColor: Colors.success },
+  acceptBtnText: { color: '#FFF', fontWeight: '700', fontSize: Typography.fontSize.xs },
+  rejectBtn: { backgroundColor: Colors.emergency },
+  rejectBtnText: { color: '#FFF', fontWeight: '700', fontSize: Typography.fontSize.xs },
 });
