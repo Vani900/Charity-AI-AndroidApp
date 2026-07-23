@@ -189,6 +189,10 @@ export default function DonationFormScreen({ route, navigation }) {
   }, [preselect]);
 
   useEffect(() => {
+    getLocation();
+  }, []);
+
+  useEffect(() => {
     if (createSuccess) {
       dispatch(clearCreateSuccess());
       Alert.alert('Donation Created! 🎉', 'Your donation has been submitted. AI is matching you with the best NGO!', [
@@ -237,19 +241,16 @@ export default function DonationFormScreen({ route, navigation }) {
   };
 
   const findMatches = async () => {
-    if (!location) {
-      Alert.alert('Location needed', 'Please enable location for AI matching');
-      await getLocation();
-      return;
-    }
+    const lat = location?.latitude || 13.0827;
+    const lng = location?.longitude || 80.2707;
     setStep(3);
     const finalDescription = selectedType === 'food'
-      ? `[Food Type: ${foodType.toUpperCase()}] ${description}`
-      : description;
+      ? `[Food Type: ${foodType.toUpperCase()}] Donation of ${quantity} food resource.`
+      : `Donation of ${quantity} ${selectedType} resource.`;
     dispatch(fetchMatches({
       resource_type: selectedType,
-      latitude: location.latitude,
-      longitude: location.longitude,
+      latitude: lat,
+      longitude: lng,
       description: finalDescription,
       quantity,
     }));
@@ -257,18 +258,17 @@ export default function DonationFormScreen({ route, navigation }) {
 
   const submitDonation = () => {
     if (!quantity) { Alert.alert('Error', 'Please enter quantity'); return; }
-    if (!description || description.length < 5) { Alert.alert('Error', 'Description must be at least 5 characters'); return; }
 
     const finalDescription = selectedType === 'food'
-      ? `[Food Type: ${foodType.toUpperCase()}] ${description}`
-      : description;
+      ? `[Food Type: ${foodType.toUpperCase()}] Donation of ${quantity} food resource.`
+      : `Donation of ${quantity} ${selectedType} resource.`;
 
     const formData = new FormData();
     formData.append('category', selectedType);
     formData.append('quantity', quantity);
     formData.append('description', finalDescription);
-    if (selectedNGO?.ngo_id) {
-      formData.append('assignedNgoId', selectedNGO.ngo_id);
+    if (selectedNGO?.ngo_id || selectedNGO?._id || selectedNGO?.id) {
+      formData.append('assignedNgoId', selectedNGO?.ngo_id || selectedNGO?._id || selectedNGO?.id);
     }
 
     images.forEach((uri, index) => {
@@ -401,19 +401,6 @@ export default function DonationFormScreen({ route, navigation }) {
               )}
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Description * (min 5 chars)</Text>
-                <TextInput
-                  style={[styles.input, styles.textarea]}
-                  placeholder="Describe your donation items..."
-                  placeholderTextColor={Colors.textLight}
-                  value={description}
-                  onChangeText={setDescription}
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
                 <Text style={styles.label}>Photos / Proof of Donation (optional, max 3)</Text>
                 <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
                   <Ionicons name="camera-outline" size={24} color={Colors.primary} style={{ marginRight: 8 }} />
@@ -432,18 +419,6 @@ export default function DonationFormScreen({ route, navigation }) {
                   </View>
                 )}
               </View>
-
-              <TouchableOpacity style={styles.locationBtn} onPress={getLocation} disabled={loadingLocation}>
-                {loadingLocation
-                  ? <ActivityIndicator color={Colors.primary} />
-                  : <>
-                    <Ionicons name="location" size={20} color={Colors.primary} />
-                    <Text style={styles.locationBtnText}>
-                      {location ? `📍 Location detected` : 'Detect My Location'}
-                    </Text>
-                  </>
-                }
-              </TouchableOpacity>
 
               <View style={styles.stepButtons}>
                 <TouchableOpacity style={styles.backBtn} onPress={() => setStep(1)}>
