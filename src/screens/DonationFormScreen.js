@@ -39,6 +39,7 @@ export default function DonationFormScreen({ route, navigation }) {
   const [expandedNgoId, setExpandedNgoId] = useState(null);
   const [selectedPayment, setSelectedPayment] = useState('UPI');
   const [explicitlyConfirmed, setExplicitlyConfirmed] = useState(false);
+  const [foodType, setFoodType] = useState('veg');
 
   useEffect(() => {
     if (preselect) { setSelectedType(preselect); setStep(2); }
@@ -99,11 +100,14 @@ export default function DonationFormScreen({ route, navigation }) {
       return;
     }
     setStep(3);
+    const finalDescription = selectedType === 'food'
+      ? `[Food Type: ${foodType.toUpperCase()}] ${description}`
+      : description;
     dispatch(fetchMatches({
       resource_type: selectedType,
       latitude: location.latitude,
       longitude: location.longitude,
-      description,
+      description: finalDescription,
       quantity,
     }));
   };
@@ -112,10 +116,14 @@ export default function DonationFormScreen({ route, navigation }) {
     if (!quantity) { Alert.alert('Error', 'Please enter quantity'); return; }
     if (!description || description.length < 5) { Alert.alert('Error', 'Description must be at least 5 characters'); return; }
 
+    const finalDescription = selectedType === 'food'
+      ? `[Food Type: ${foodType.toUpperCase()}] ${description}`
+      : description;
+
     const formData = new FormData();
     formData.append('category', selectedType);
     formData.append('quantity', quantity);
-    formData.append('description', description);
+    formData.append('description', finalDescription);
     if (selectedNGO?.ngo_id) {
       formData.append('assignedNgoId', selectedNGO.ngo_id);
     }
@@ -221,6 +229,33 @@ export default function DonationFormScreen({ route, navigation }) {
                   onChangeText={setQuantity}
                 />
               </View>
+
+              {selectedType === 'food' && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Food Type *</Text>
+                  <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+                    {['veg', 'non-veg'].map((type) => (
+                      <TouchableOpacity
+                        key={type}
+                        style={[
+                          styles.foodTypeBtn,
+                          foodType === type && styles.foodTypeBtnActive
+                        ]}
+                        onPress={() => setFoodType(type)}
+                      >
+                        <Ionicons
+                          name={foodType === type ? "radio-button-on" : "radio-button-off"}
+                          size={18}
+                          color={foodType === type ? Colors.primary : Colors.textSecondary}
+                        />
+                        <Text style={[styles.foodTypeLabel, foodType === type && { color: Colors.primary }]}>
+                          {type === 'veg' ? 'Veg 🟢' : 'Non-Veg 🔴'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
 
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Description * (min 5 chars)</Text>
@@ -782,5 +817,26 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.sm,
     color: Colors.text,
     fontWeight: '600',
+  },
+  foodTypeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    backgroundColor: Colors.background,
+  },
+  foodTypeBtnActive: {
+    borderColor: Colors.primary,
+    backgroundColor: '#F0FDF4',
+  },
+  foodTypeLabel: {
+    fontSize: Typography.fontSize.md,
+    fontWeight: '700',
+    color: Colors.text,
+    textTransform: 'capitalize',
   },
 });
