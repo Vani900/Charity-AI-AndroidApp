@@ -46,6 +46,7 @@ export default function DonationFormScreen({ route, navigation }) {
   const [adultSize, setAdultSize] = useState('M');
   const [kidsGender, setKidsGender] = useState('boy');
   const [kidsAge, setKidsAge] = useState('');
+  const [booksClass, setBooksClass] = useState('');
 
   const [matchingNgos, setMatchingNgos] = useState([]);
   const [categories, setCategories] = useState({ bestMatches: [], nearbyNgos: [], otherNgos: [] });
@@ -255,6 +256,8 @@ export default function DonationFormScreen({ route, navigation }) {
       ? clothesCategory === 'adult'
         ? `[Category: ADULT, Gender: ${adultGender.toUpperCase()}, Size: ${adultSize}] Donation of ${quantity} clothes resource.`
         : `[Category: KIDS, Gender: ${kidsGender.toUpperCase()}, Age: ${kidsAge || 'Not specified'}] Donation of ${quantity} clothes resource.`
+      : selectedType === 'books'
+      ? `[Class/Grade: ${booksClass || 'Not specified'}] Donation of ${quantity} books resource.`
       : `Donation of ${quantity} ${selectedType} resource.`;
     dispatch(fetchMatches({
       resource_type: selectedType,
@@ -274,6 +277,8 @@ export default function DonationFormScreen({ route, navigation }) {
       ? clothesCategory === 'adult'
         ? `[Category: ADULT, Gender: ${adultGender.toUpperCase()}, Size: ${adultSize}] Donation of ${quantity} clothes resource.`
         : `[Category: KIDS, Gender: ${kidsGender.toUpperCase()}, Age: ${kidsAge || 'Not specified'}] Donation of ${quantity} clothes resource.`
+      : selectedType === 'books'
+      ? `[Class/Grade: ${booksClass || 'Not specified'}] Donation of ${quantity} books resource.`
       : `Donation of ${quantity} ${selectedType} resource.`;
 
     const formData = new FormData();
@@ -527,6 +532,19 @@ export default function DonationFormScreen({ route, navigation }) {
                     </>
                   )}
                 </>
+              )}
+
+              {selectedType === 'books' && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Class / Grade * (e.g. Class 10, College)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. Primary School, Class 10, College"
+                    placeholderTextColor={Colors.textLight}
+                    value={booksClass}
+                    onChangeText={setBooksClass}
+                  />
+                </View>
               )}
 
               <View style={styles.stepButtons}>
