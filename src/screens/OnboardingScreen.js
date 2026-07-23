@@ -18,16 +18,6 @@ const SLIDES = [
     subtitle: 'AI matches your donation with the right NGO based on location, urgency, and resource needs.',
     gradient: [Colors.primaryDark, Colors.primary],
   },
-  {
-    id: '2', emoji: '🚨', title: 'Emergency Mode',
-    subtitle: 'Get real-time alerts for flood relief, food shortages, and critical emergencies near you. Act instantly.',
-    gradient: ['#B91C1C', '#EF4444'],
-  },
-  {
-    id: '3', emoji: '⛓️', title: 'Blockchain Trust',
-    subtitle: 'Every donation is recorded on blockchain for complete transparency and tamper-proof verification.',
-    gradient: ['#1D4ED8', Colors.primary],
-  },
 ];
 
 export default function OnboardingScreen({ navigation }) {
