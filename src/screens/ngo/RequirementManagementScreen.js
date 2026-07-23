@@ -13,7 +13,7 @@ const URGENCY_LEVELS = ['low', 'medium', 'high', 'critical'];
 const RESOURCE_TYPES = ['money', 'food', 'clothes', 'books'];
 const URGENCY_COLORS = { low: Colors.success, medium: Colors.warning, high: Colors.accentOrange, critical: Colors.emergency };
 
-export default function RequirementManagementScreen() {
+export default function RequirementManagementScreen({ navigation }) {
   const [requests, setRequests] = useState([]);
   const [filteredRequests, setFilteredRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -71,10 +71,23 @@ export default function RequirementManagementScreen() {
         payload.needByDate = form.needByDate.trim();
       }
       await ngosAPI.createRequirement(payload);
-      Alert.alert('Request Posted! ✅', 'Donors will be matched to your requirement.');
-      setShowForm(false);
-      setForm({ category: 'food', urgency: 'medium', quantity: '', description: '', needByDate: '' });
-      loadRequests();
+      Alert.alert(
+        'Request Posted! ✅',
+        'Donors will be matched to your requirement.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setShowForm(false);
+              setForm({ category: 'food', urgency: 'medium', quantity: '', description: '', needByDate: '' });
+              loadRequests();
+              if (navigation) {
+                navigation.navigate('Dashboard');
+              }
+            }
+          }
+        ]
+      );
     } catch (e) {
       Alert.alert('Error', e.response?.data?.message || 'Failed to post requirement');
     } finally { setSubmitting(false); }
