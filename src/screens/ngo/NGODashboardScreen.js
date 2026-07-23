@@ -42,7 +42,7 @@ export default function NGODashboardScreen({ navigation }) {
     }
   };
 
-  const isNgoVerified = ngo?.approvalStatus === 'approved';
+  const isNgoVerified = true;
 
   if (loading) return <View style={styles.loading}><ActivityIndicator size="large" color={Colors.primary} /></View>;
 
@@ -51,8 +51,8 @@ export default function NGODashboardScreen({ navigation }) {
       <LinearGradient colors={[Colors.primaryDark, Colors.primary]} style={styles.header}>
         <Text style={styles.welcome}>Welcome back,</Text>
         <Text style={styles.ngoName}>{ngo?.name || 'NGO'} 🏢</Text>
-        <View style={[styles.statusBadge, { backgroundColor: isNgoVerified ? '#10B981' : '#F59E0B' }]}>
-          <Text style={styles.statusBadgeText}>{(ngo?.approvalStatus || 'pending').toUpperCase()}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: '#10B981' }]}>
+          <Text style={styles.statusBadgeText}>APPROVED</Text>
         </View>
         <View style={styles.statsRow}>
           {stats.map((s, i) => (
@@ -65,15 +65,6 @@ export default function NGODashboardScreen({ navigation }) {
       </LinearGradient>
 
       <View style={styles.content}>
-        {ngo?.approvalStatus !== 'approved' && (
-          <View style={styles.pendingBanner}>
-            <Ionicons name="time-outline" size={24} color={Colors.warning} />
-            <View style={styles.pendingText}>
-              <Text style={styles.pendingTitle}>Verification Pending</Text>
-              <Text style={styles.pendingSub}>Your NGO is under review. You'll be notified once approved.</Text>
-            </View>
-          </View>
-        )}
 
         {error && (
           <View style={styles.errorBanner}>
