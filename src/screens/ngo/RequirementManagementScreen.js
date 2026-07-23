@@ -61,7 +61,16 @@ export default function RequirementManagementScreen() {
     if (!form.description || form.description.length < 5) { Alert.alert('Error', 'Please enter a description (min 5 characters)'); return; }
     setSubmitting(true);
     try {
-      await ngosAPI.createRequirement(form);
+      const payload = {
+        category: form.category,
+        urgency: form.urgency,
+        quantity: form.quantity,
+        description: form.description,
+      };
+      if (form.needByDate && form.needByDate.trim() !== '') {
+        payload.needByDate = form.needByDate.trim();
+      }
+      await ngosAPI.createRequirement(payload);
       Alert.alert('Request Posted! ✅', 'Donors will be matched to your requirement.');
       setShowForm(false);
       setForm({ category: 'food', urgency: 'medium', quantity: '', description: '', needByDate: '' });
