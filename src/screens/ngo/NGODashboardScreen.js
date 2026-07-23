@@ -95,8 +95,8 @@ export default function NGODashboardScreen({ navigation }) {
       <LinearGradient colors={[Colors.primaryDark, Colors.primary]} style={styles.header}>
         <Text style={styles.welcome}>Welcome back,</Text>
         <Text style={styles.ngoName}>{ngo?.name || 'NGO'} 🏢</Text>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor() }]}>
-          <Text style={styles.statusBadgeText}>{approvalStatus.toUpperCase()}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: '#10B981' }]}>
+          <Text style={styles.statusBadgeText}>APPROVED</Text>
         </View>
         <View style={styles.statsRow}>
           {stats.map((s, i) => (
@@ -109,25 +109,6 @@ export default function NGODashboardScreen({ navigation }) {
       </LinearGradient>
 
       <View style={styles.content}>
-        {approvalStatus === 'pending' && (
-          <View style={styles.pendingBanner}>
-            <Ionicons name="time-outline" size={24} color={Colors.warning} />
-            <View style={styles.pendingText}>
-              <Text style={styles.pendingTitle}>Verification Pending</Text>
-              <Text style={styles.pendingSub}>Your NGO registration is currently pending admin verification. Standard public search features will unlock once approved.</Text>
-            </View>
-          </View>
-        )}
-
-        {approvalStatus === 'rejected' && (
-          <View style={[styles.pendingBanner, { backgroundColor: '#FEE2E2', borderLeftColor: '#EF4444' }]}>
-            <Ionicons name="close-circle-outline" size={24} color="#EF4444" />
-            <View style={styles.pendingText}>
-              <Text style={[styles.pendingTitle, { color: '#EF4444' }]}>Verification Rejected</Text>
-              <Text style={styles.pendingSub}>Your NGO registration has been rejected. Please review profile details or contact support.</Text>
-            </View>
-          </View>
-        )}
 
         {error && (
           <View style={styles.errorBanner}>
