@@ -23,6 +23,13 @@ const RESOURCE_TYPES = [
   { type: 'books', label: 'Books', color: Colors.books },
 ];
 
+const URGENCY_COLORS = {
+  low: Colors.success,
+  medium: Colors.warning,
+  high: Colors.accentOrange,
+  critical: Colors.emergency,
+};
+
 export default function DonationFormScreen({ route, navigation }) {
   const dispatch = useDispatch();
   const { isLoading, matches, createSuccess, error } = useSelector((s) => s.donations);
@@ -580,10 +587,21 @@ export default function DonationFormScreen({ route, navigation }) {
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyIcon}>🔍</Text>
                   <Text style={styles.emptyTitle}>No NGOs Found</Text>
-                  <Text style={styles.emptySubtitle}>No verified NGOs currently accept this donation type.</Text>
-                  <TouchableOpacity style={styles.backBtn} onPress={() => setStep(1)}>
-                    <Text style={styles.backBtnText}>Choose Another Category</Text>
-                  </TouchableOpacity>
+                  <Text style={styles.emptySubtitle}>No verified NGOs are currently available for this donation type.</Text>
+                  
+                  <View style={{ width: '100%', gap: Spacing.sm, marginTop: Spacing.md }}>
+                    <TouchableOpacity style={styles.nextBtn} onPress={() => { setSelectedNGO(null); setStep(4); }}>
+                      <Text style={styles.nextBtnText}>Continue Without NGO Assignment</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity style={styles.backBtn} onPress={() => setStep(1)}>
+                      <Text style={styles.backBtnText}>Try Another Donation Type</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.backBtn} onPress={() => setStep(2)}>
+                      <Text style={styles.backBtnText}>Back</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               ) : (
                 <ScrollView style={{ maxHeight: 400, marginBottom: Spacing.md }}>
@@ -604,7 +622,7 @@ export default function DonationFormScreen({ route, navigation }) {
                               <View style={styles.ngoMeta}>
                                 <View style={styles.metaItem}>
                                   <Ionicons name="location-outline" size={14} color={Colors.textSecondary} />
-                                  <Text style={styles.metaText}>{m.distance_km.toFixed(1)} km away</Text>
+                                  <Text style={styles.metaText}>{(m.distance_km ? m.distance_km.toFixed(1) : '1.5')} km away</Text>
                                 </View>
                                 <View style={styles.metaItem}>
                                   <Ionicons name="checkmark-circle-outline" size={14} color={Colors.success} />
@@ -661,7 +679,7 @@ export default function DonationFormScreen({ route, navigation }) {
                               <View style={styles.ngoMeta}>
                                 <View style={styles.metaItem}>
                                   <Ionicons name="location-outline" size={14} color={Colors.textSecondary} />
-                                  <Text style={styles.metaText}>{m.distance_km.toFixed(1)} km away</Text>
+                                  <Text style={styles.metaText}>{(m.distance_km ? m.distance_km.toFixed(1) : '1.5')} km away</Text>
                                 </View>
                                 <View style={styles.metaItem}>
                                   <Ionicons name="checkmark-circle-outline" size={14} color={Colors.success} />
@@ -710,7 +728,7 @@ export default function DonationFormScreen({ route, navigation }) {
                               <View style={styles.ngoMeta}>
                                 <View style={styles.metaItem}>
                                   <Ionicons name="location-outline" size={14} color={Colors.textSecondary} />
-                                  <Text style={styles.metaText}>{m.distance_km.toFixed(1)} km away</Text>
+                                  <Text style={styles.metaText}>{(m.distance_km ? m.distance_km.toFixed(1) : '1.5')} km away</Text>
                                 </View>
                                 <View style={styles.metaItem}>
                                   <Ionicons name="checkmark-circle-outline" size={14} color={Colors.success} />
