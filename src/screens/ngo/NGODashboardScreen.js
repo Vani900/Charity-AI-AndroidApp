@@ -7,7 +7,8 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, A
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
-import { ngosAPI, authAPI } from '../../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ngosAPI, authAPI, donationsAPI } from '../../services/api';
 import { Colors, Typography, Spacing, BorderRadius, Shadows, StatusColors, DonationTypeIcons } from '../../utils/theme';
 
 const URGENCY_COLORS = { low: Colors.success, medium: Colors.warning, high: Colors.accentOrange, critical: Colors.emergency };
@@ -22,8 +23,9 @@ export default function NGODashboardScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
+  const [filter, setFilter] = useState('pending');
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [filter]);
 
   const loadData = async () => {
     try {
@@ -35,7 +37,6 @@ export default function NGODashboardScreen({ navigation }) {
       ]);
       const currentNgo = profileRes.data?.data || null;
       setNgo(currentNgo);
-      setDonations(dashRes.data?.data?.requests || []);
       setRequirements(reqsRes.data?.data || reqsRes.data || []);
 
       const fetchedStats = [...(dashRes.data?.data?.stats || [])];
@@ -49,6 +50,31 @@ export default function NGODashboardScreen({ navigation }) {
         });
       }
       setStats(fetchedStats);
+
+      // Load filtered donation requests
+      if (filter === 'pending') {
+        setDonations(dashRes.data?.data?.requests || []);
+      } else {
+        const storedStr = await AsyncStorage.getItem('ngo_accepted_donations') || '[]';
+        const activeIds = JSON.parse(storedStr);
+        const list = [];
+        for (const id of activeIds) {
+          try {
+            const { data: res } = await donationsAPI.getTracking(id);
+            if (res.success && res.data?.donationId) {
+              const d = res.data.donationId;
+              if (filter === 'accepted' && ['accepted', 'in_transit', 'delivered', 'verified'].includes(d.status)) {
+                list.push(d);
+              } else if (filter === 'rejected' && d.status === 'cancelled') {
+                list.push(d);
+              }
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch cached donation ${id}:`, err.message);
+          }
+        }
+        setDonations(list);
+      }
     } catch (e) {
       console.warn('Failed to load NGO dashboard:', e.message);
       setError('Failed to refresh data from server.');
@@ -61,6 +87,15 @@ export default function NGODashboardScreen({ navigation }) {
     setUpdatingId(id);
     try {
       await ngosAPI.updateStatus(id, status, `Status changed via mobile dashboard overview.`);
+      
+      // Cache the accepted/rejected ones locally to track status filters correctly
+      const storedStr = await AsyncStorage.getItem('ngo_accepted_donations') || '[]';
+      const activeIds = JSON.parse(storedStr);
+      if (!activeIds.includes(id)) {
+        activeIds.push(id);
+        await AsyncStorage.setItem('ngo_accepted_donations', JSON.stringify(activeIds));
+      }
+
       Alert.alert('Success ✅', `Request status updated to ${status}.`);
       loadData();
     } catch (e) {
@@ -79,16 +114,8 @@ export default function NGODashboardScreen({ navigation }) {
     );
   };
 
-  const isNgoVerified = true; // Permitted actions per backend schema access
+  const isNgoVerified = true;
   const approvalStatus = ngo?.approvalStatus || 'pending';
-
-  const getStatusColor = () => {
-    if (approvalStatus === 'approved') return '#10B981';
-    if (approvalStatus === 'rejected') return '#EF4444';
-    return '#F59E0B';
-  };
-
-  if (loading) return <View style={styles.loading}><ActivityIndicator size="large" color={Colors.primary} /></View>;
 
   return (
     <ScrollView style={styles.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor={Colors.primary} />}>
@@ -109,7 +136,6 @@ export default function NGODashboardScreen({ navigation }) {
       </LinearGradient>
 
       <View style={styles.content}>
-
         {error && (
           <View style={styles.errorBanner}>
             <Ionicons name="alert-circle-outline" size={20} color={Colors.emergency} />
@@ -164,12 +190,28 @@ export default function NGODashboardScreen({ navigation }) {
           ))
         )}
 
-        {/* Donation Requests */}
-        <Text style={[styles.sectionTitle, { marginTop: Spacing.xl, marginBottom: Spacing.md }]}>Donation Requests</Text>
+        {/* Donation Requests with accept, reject, pending tabs */}
+        <View style={[styles.sectionHeader, { marginTop: Spacing.xl, marginBottom: Spacing.md }]}>
+          <Text style={styles.sectionTitle}>Donation Requests</Text>
+          <View style={styles.filterRow}>
+            {['pending', 'accepted', 'rejected'].map((f) => (
+              <TouchableOpacity
+                key={f}
+                style={[styles.filterChip, filter === f && styles.filterChipActive]}
+                onPress={() => setFilter(f)}
+              >
+                <Text style={[styles.filterChipText, filter === f && styles.filterChipTextActive]}>
+                  {f.toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
         {donations.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.emptyIcon}>🎁</Text>
-            <Text style={styles.emptyText}>No donation requests available</Text>
+            <Text style={styles.emptyText}>No {filter} requests available</Text>
           </View>
         ) : (
           donations.map((d) => (
@@ -182,26 +224,70 @@ export default function NGODashboardScreen({ navigation }) {
                   {d.donorId?.phone && <Text style={styles.donPhone}>📞 {d.donorId.phone}</Text>}
                   <Text style={styles.donDate}>{d.createdAt ? new Date(d.createdAt).toLocaleDateString() : 'Recent'}</Text>
                 </View>
+                <View style={[styles.statusTag, { backgroundColor: (StatusColors[d.status] || Colors.primary) + '20' }]}>
+                  <Text style={[styles.statusTagText, { color: StatusColors[d.status] || Colors.primary }]}>{d.status}</Text>
+                </View>
               </View>
 
               <View style={styles.donActions}>
                 <TouchableOpacity style={styles.detailsBtn} onPress={() => viewRequestDetails(d)}>
                   <Text style={styles.detailsBtnText}>View Details</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.actionBtn, styles.acceptBtn]} 
-                  onPress={() => handleUpdateStatus(d._id, 'accepted')}
-                  disabled={updatingId === d._id}
-                >
-                  {updatingId === d._id ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.acceptBtnText}>Accept</Text>}
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.actionBtn, styles.rejectBtn]} 
-                  onPress={() => handleUpdateStatus(d._id, 'cancelled')}
-                  disabled={updatingId === d._id}
-                >
-                  {updatingId === d._id ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.rejectBtnText}>Reject</Text>}
-                </TouchableOpacity>
+
+                {d.status === 'pending' && (
+                  <>
+                    <TouchableOpacity 
+                      style={[styles.actionBtn, styles.acceptBtn]} 
+                      onPress={() => handleUpdateStatus(d._id, 'accepted')}
+                      disabled={updatingId === d._id}
+                    >
+                      {updatingId === d._id ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.acceptBtnText}>Accept</Text>}
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.actionBtn, styles.rejectBtn]} 
+                      onPress={() => handleUpdateStatus(d._id, 'cancelled')}
+                      disabled={updatingId === d._id}
+                    >
+                      {updatingId === d._id ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.rejectBtnText}>Reject</Text>}
+                    </TouchableOpacity>
+                  </>
+                )}
+
+                {d.status === 'accepted' && (
+                  <>
+                    <TouchableOpacity 
+                      style={[styles.actionBtn, { backgroundColor: Colors.info }]} 
+                      onPress={() => handleUpdateStatus(d._id, 'in_transit')}
+                    >
+                      <Text style={styles.acceptBtnText}>In Transit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.actionBtn, styles.acceptBtn]} 
+                      onPress={() => handleUpdateStatus(d._id, 'delivered')}
+                    >
+                      <Text style={styles.acceptBtnText}>Deliver</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+
+                {d.status === 'in_transit' && (
+                  <TouchableOpacity 
+                    style={[styles.actionBtn, styles.acceptBtn, { flex: 1 }]} 
+                    onPress={() => handleUpdateStatus(d._id, 'delivered')}
+                  >
+                    <Text style={styles.acceptBtnText}>Confirm Delivery</Text>
+                  </TouchableOpacity>
+                )}
+
+                {d.status !== 'pending' && d.status !== 'cancelled' && (
+                  <TouchableOpacity
+                    style={styles.chatBtn}
+                    onPress={() => navigation.navigate('Requests', { screen: 'DonationChat', params: { donationId: d._id } })}
+                  >
+                    <Ionicons name="chatbubbles-outline" size={14} color={Colors.primary} />
+                    <Text style={styles.chatBtnText}>Chat</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           ))
@@ -231,9 +317,6 @@ const styles = StyleSheet.create({
   statValue: { fontSize: Typography.fontSize.xl, fontWeight: '800', color: '#FFF' },
   statLabel: { fontSize: Typography.fontSize.xs, color: 'rgba(255,255,255,0.7)', textAlign: 'center' },
   content: { padding: Spacing.lg },
-  pendingBanner: { flexDirection: 'row', gap: Spacing.md, backgroundColor: '#FEF3C7', borderRadius: BorderRadius.lg, padding: Spacing.md, marginBottom: Spacing.lg, borderLeftWidth: 4, borderLeftColor: Colors.warning },
-  pendingTitle: { fontWeight: '700', color: Colors.warning, fontSize: Typography.fontSize.md },
-  pendingSub: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, marginTop: 2 },
   errorBanner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: '#FEE2E2', padding: Spacing.md, borderRadius: BorderRadius.md, marginBottom: Spacing.lg },
   errorText: { color: Colors.emergency, fontWeight: '600', fontSize: Typography.fontSize.sm },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
@@ -267,12 +350,21 @@ const styles = StyleSheet.create({
   donDonor: { fontSize: Typography.fontSize.sm, color: Colors.text, marginTop: 2 },
   donPhone: { fontSize: Typography.fontSize.xs, color: Colors.textSecondary, marginTop: 1 },
   donDate: { fontSize: Typography.fontSize.xs, color: Colors.textSecondary, marginTop: 2 },
-  donActions: { flexDirection: 'row', gap: Spacing.sm, paddingTop: Spacing.sm, justifyContent: 'flex-end' },
-  actionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: BorderRadius.md },
-  detailsBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: BorderRadius.md, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
+  statusTag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: BorderRadius.full, alignSelf: 'flex-start' },
+  statusTagText: { fontSize: 9, fontWeight: '700', textTransform: 'uppercase' },
+  donActions: { flexDirection: 'row', gap: Spacing.xs, paddingTop: Spacing.sm, justifyContent: 'flex-end', flexWrap: 'wrap' },
+  actionBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: BorderRadius.md },
+  detailsBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: BorderRadius.md, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
   detailsBtnText: { color: Colors.text, fontWeight: '600', fontSize: Typography.fontSize.xs },
   acceptBtn: { backgroundColor: Colors.success },
   acceptBtnText: { color: '#FFF', fontWeight: '700', fontSize: Typography.fontSize.xs },
   rejectBtn: { backgroundColor: Colors.emergency },
   rejectBtnText: { color: '#FFF', fontWeight: '700', fontSize: Typography.fontSize.xs },
+  filterRow: { flexDirection: 'row', gap: Spacing.xs, alignItems: 'center' },
+  filterChip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: BorderRadius.full, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.background },
+  filterChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  filterChipText: { fontSize: 9, fontWeight: '700', color: Colors.textSecondary },
+  filterChipTextActive: { color: '#FFF' },
+  chatBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: Colors.primary, borderRadius: BorderRadius.md, paddingHorizontal: 8, paddingVertical: 4 },
+  chatBtnText: { color: Colors.primary, fontSize: Typography.fontSize.xs, fontWeight: '700' },
 });
