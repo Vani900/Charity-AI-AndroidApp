@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useDispatch, useSelector } from 'react-redux';
 import { createDonation, fetchMatches, clearCreateSuccess, clearDonationError } from '../redux/slices/donationSlice';
+import { ngosAPI, matchingAPI } from '../services/api';
 import { Colors, Typography, Spacing, BorderRadius, Shadows, DonationTypeIcons } from '../utils/theme';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
@@ -40,6 +41,148 @@ export default function DonationFormScreen({ route, navigation }) {
   const [selectedPayment, setSelectedPayment] = useState('UPI');
   const [explicitlyConfirmed, setExplicitlyConfirmed] = useState(false);
   const [foodType, setFoodType] = useState('veg');
+
+  const [matchingNgos, setMatchingNgos] = useState([]);
+  const [categories, setCategories] = useState({ bestMatches: [], nearbyNgos: [], otherNgos: [] });
+  const [loadingMatches, setLoadingMatches] = useState(false);
+  const [matchingError, setMatchingError] = useState(null);
+
+  function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  const runLocalMatching = async () => {
+    setLoadingMatches(true);
+    setMatchingError(null);
+    try {
+      const lat = location?.latitude || 13.0827;
+      const lng = location?.longitude || 80.2707;
+      
+      const [reqsRes, nearbyRes] = await Promise.all([
+        ngosAPI.getRequirements(),
+        matchingAPI.getNearby({
+          longitude: lng,
+          latitude: lat,
+          maxDistance: 200000 // 200km radius
+        }).catch(() => ({ data: { success: true, data: [] } }))
+      ]);
+
+      const allRequirements = reqsRes.data?.data || reqsRes.data || [];
+      const ngosList = nearbyRes.data?.data || [];
+
+      if (ngosList.length === 0) {
+        setMatchingNgos([]);
+        setCategories({ bestMatches: [], nearbyNgos: [], otherNgos: [] });
+        return;
+      }
+
+      const scoredNgos = ngosList.map((ngo) => {
+        const ngoId = ngo._id || ngo.id;
+        
+        const matchingReq = allRequirements.find(
+          (r) => (r.ngoId?._id?.toString() === ngoId.toString() || r.ngoId?.toString() === ngoId.toString()) &&
+                 r.category?.toLowerCase() === selectedType?.toLowerCase() &&
+                 r.status !== 'closed'
+        );
+
+        let distance = 1.5;
+        if (location && ngo.location?.coordinates) {
+          const [ngoLng, ngoLat] = ngo.location.coordinates;
+          distance = calculateHaversineDistance(
+            location.latitude,
+            location.longitude,
+            ngoLat,
+            ngoLng
+          );
+        } else if (ngo.location?.coordinates) {
+          const [ngoLng, ngoLat] = ngo.location.coordinates;
+          distance = calculateHaversineDistance(
+            13.0827,
+            80.2707,
+            ngoLat,
+            ngoLng
+          );
+        }
+
+        let score = 30; // base score
+        let reason = `Verified Match: Accepts ${selectedType?.toUpperCase()} and is registered near Chennai.`;
+        let priority = 4;
+
+        if (matchingReq) {
+          score += 40;
+          priority = 1;
+          const urgency = matchingReq.urgency?.toLowerCase() || 'medium';
+          if (urgency === 'critical') score += 20;
+          else if (urgency === 'high') score += 15;
+          else if (urgency === 'medium') score += 10;
+          else score += 5;
+
+          reason = `Perfect Match: NGO has an active ${urgency.toUpperCase()} requirement for ${selectedType?.toUpperCase()} and is nearby.`;
+        } else {
+          if (distance <= 15) {
+            score += 20;
+            priority = 2;
+            reason = `Nearby Match: Located ${distance.toFixed(1)} km away, accepting ${selectedType?.toUpperCase()} donations.`;
+          } else {
+            score += 5;
+            priority = 3;
+            reason = `Extended Match: Accepts ${selectedType?.toUpperCase()} but is located further (${distance.toFixed(1)} km).`;
+          }
+        }
+
+        if (ngo.approvalStatus === 'approved') {
+          score += 10;
+        }
+
+        score = Math.min(score, 100);
+
+        return {
+          ...ngo,
+          ngo_id: ngoId,
+          ngo_name: ngo.name,
+          ngo_address: ngo.address || 'Chennai Partner Area',
+          distance_km: distance,
+          urgency: matchingReq ? matchingReq.urgency : 'medium',
+          score: score / 100,
+          reason,
+          priority,
+          matchingReq,
+        };
+      });
+
+      scoredNgos.sort((a, b) => b.score - a.score);
+
+      const bestMatches = scoredNgos.filter((ngo) => ngo.priority === 1);
+      const nearbyNgos = scoredNgos.filter((ngo) => ngo.priority === 2);
+      const otherNgos = scoredNgos.filter((ngo) => ngo.priority === 3 || ngo.priority === 4);
+
+      setCategories({
+        bestMatches,
+        nearbyNgos,
+        otherNgos,
+      });
+      setMatchingNgos(scoredNgos);
+    } catch (err) {
+      console.warn('Failed to calculate local matching:', err.message);
+      setMatchingError('Failed to retrieve matched NGOs. Please retry.');
+    } finally {
+      setLoadingMatches(false);
+    }
+  };
+
+  useEffect(() => {
+    if (step === 3) {
+      runLocalMatching();
+    }
+  }, [step, selectedType]);
 
   useEffect(() => {
     if (preselect) { setSelectedType(preselect); setStep(2); }
@@ -316,103 +459,201 @@ export default function DonationFormScreen({ route, navigation }) {
           {/* Step 3: AI Match */}
           {step === 3 && (
             <>
-              <Text style={styles.stepTitle}>AI-Matched NGOs 🤖</Text>
-              <Text style={styles.stepSub}>Based on location, urgency & resource type</Text>
+              <Text style={styles.stepTitle}>Recommended NGOs for Your Donation 🤖</Text>
+              <Text style={styles.stepSub}>Based on your donation type, location, urgency, and NGO requirements</Text>
 
-              {isLoading ? (
+              {loadingMatches ? (
                 <View style={styles.loadingBox}>
                   <ActivityIndicator size="large" color={Colors.primary} />
                   <Text style={styles.loadingText}>Finding best matches...</Text>
                 </View>
-              ) : matches.length === 0 ? (
+              ) : matchingError ? (
+                <View style={styles.errorBox}>
+                  <Text style={styles.errorText}>{matchingError}</Text>
+                  <TouchableOpacity style={styles.retryBtn} onPress={runLocalMatching}>
+                    <Text style={styles.retryBtnText}>Retry Match</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : matchingNgos.length === 0 ? (
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyIcon}>🔍</Text>
                   <Text style={styles.emptyTitle}>No NGOs Found</Text>
-                  <Text style={styles.emptySubtitle}>No NGOs currently need this type of donation nearby</Text>
-                  <TouchableOpacity style={styles.nextBtn} onPress={() => { setSelectedNGO(null); setStep(4); }}>
-                    <Text style={styles.nextBtnText}>Submit Anyway →</Text>
+                  <Text style={styles.emptySubtitle}>No verified NGOs currently accept this donation type.</Text>
+                  <TouchableOpacity style={styles.backBtn} onPress={() => setStep(1)}>
+                    <Text style={styles.backBtnText}>Choose Another Category</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
-                <>
-                  {matches.map((m) => {
-                    const isExpanded = expandedNgoId === m.ngo_id;
-                    const isSelected = selectedNGO?.ngo_id === m.ngo_id;
-                    return (
-                      <View key={m.ngo_id} style={[
-                        styles.ngoCard,
-                        isSelected && styles.ngoCardSelected,
-                        m.isAiMatched && styles.ngoCardAi,
-                      ]}>
-                        <TouchableOpacity
-                          style={styles.ngoCardHeaderTouchable}
-                          onPress={() => setExpandedNgoId(isExpanded ? null : m.ngo_id)}
-                        >
-                          {m.isAiMatched && (
-                            <View style={styles.aiBadge}>
-                              <Ionicons name="sparkles" size={12} color="#FFF" style={{ marginRight: 4 }} />
-                              <Text style={styles.aiBadgeText}>AI Recommended Match</Text>
-                            </View>
-                          )}
-                          <View style={styles.ngoCardHeader}>
-                            <Text style={styles.ngoName}>{m.ngo_name}</Text>
-                            <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={Colors.textSecondary} />
-                          </View>
-                          <View style={styles.ngoMeta}>
-                            <View style={styles.metaItem}>
-                              <Ionicons name="location-outline" size={14} color={Colors.textSecondary} />
-                              <Text style={styles.metaText}>{m.distance_km} km away</Text>
-                            </View>
-                            <View style={styles.metaItem}>
-                              <Ionicons name="alert-circle-outline" size={14} color={Colors.warning} />
-                              <Text style={styles.metaText}>{m.urgency} urgency</Text>
-                            </View>
-                          </View>
-                        </TouchableOpacity>
-
-                        {isExpanded && (
-                          <View style={styles.ngoDetailsExpand}>
-                            <Text style={styles.ngoDetailsLabel}>NGO Description:</Text>
-                            <Text style={styles.ngoDetailsVal}>{m.reason || 'Provides dynamic multi-resource charity support.'}</Text>
-                            
-                            <Text style={styles.ngoDetailsLabel}>Verification Status:</Text>
-                            <Text style={[styles.ngoDetailsVal, { color: Colors.success, fontWeight: '700' }]}>✓ Approved & Verified Partner</Text>
-
-                            <Text style={styles.ngoDetailsLabel}>Location Address:</Text>
-                            <Text style={styles.ngoDetailsVal}>{m.ngo_address || 'Chennai Partner Area'}</Text>
-
-                            <Text style={styles.ngoDetailsLabel}>Required Resource:</Text>
-                            <Text style={styles.ngoDetailsVal}>{selectedType?.toUpperCase()}</Text>
-
-                            <Text style={styles.ngoDetailsLabel}>Required Quantity:</Text>
-                            <Text style={styles.ngoDetailsVal}>{m.quantity || 'As requested'}</Text>
-
-                            <Text style={styles.ngoDetailsLabel}>Contact details:</Text>
-                            <Text style={styles.ngoDetailsVal}>Available upon donation confirmation</Text>
-
-                            <TouchableOpacity
-                              style={[styles.selectNgoBtn, isSelected && styles.selectNgoBtnActive]}
-                              onPress={() => setSelectedNGO(m)}
-                            >
-                              <Text style={styles.selectNgoBtnText}>
-                                {isSelected ? '✓ NGO Selected' : 'Select This NGO'}
-                              </Text>
+                <ScrollView style={{ maxHeight: 400, marginBottom: Spacing.md }}>
+                  {/* 1. Best Matches */}
+                  {categories.bestMatches.length > 0 && (
+                    <View style={styles.categoryContainer}>
+                      <Text style={styles.categoryTitle}>🌟 BEST MATCHES</Text>
+                      {categories.bestMatches.map((m) => {
+                        const isExpanded = expandedNgoId === m.ngo_id;
+                        const isSelected = selectedNGO?.ngo_id === m.ngo_id;
+                        return (
+                          <View key={m.ngo_id} style={[styles.ngoCard, isSelected && styles.ngoCardSelected]}>
+                            <TouchableOpacity style={styles.ngoCardHeaderTouchable} onPress={() => setExpandedNgoId(isExpanded ? null : m.ngo_id)}>
+                              <View style={styles.ngoCardHeader}>
+                                <Text style={styles.ngoName}>{m.ngo_name}</Text>
+                                <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={Colors.textSecondary} />
+                              </View>
+                              <View style={styles.ngoMeta}>
+                                <View style={styles.metaItem}>
+                                  <Ionicons name="location-outline" size={14} color={Colors.textSecondary} />
+                                  <Text style={styles.metaText}>{m.distance_km.toFixed(1)} km away</Text>
+                                </View>
+                                <View style={styles.metaItem}>
+                                  <Ionicons name="checkmark-circle-outline" size={14} color={Colors.success} />
+                                  <Text style={[styles.metaText, { color: Colors.success, fontWeight: '700' }]}>Verified</Text>
+                                </View>
+                                <View style={styles.metaItem}>
+                                  <Ionicons name="analytics-outline" size={14} color={Colors.primary} />
+                                  <Text style={[styles.metaText, { color: Colors.primary, fontWeight: '700' }]}>{Math.round(m.score * 100)}% Match</Text>
+                                </View>
+                              </View>
+                              {m.reason && <Text style={styles.recommendationReason}>🤖 {m.reason}</Text>}
                             </TouchableOpacity>
+                            {isExpanded && (
+                              <View style={styles.ngoDetailsExpand}>
+                                <Text style={styles.ngoDetailsLabel}>Verification Status:</Text>
+                                <Text style={[styles.ngoDetailsVal, { color: Colors.success, fontWeight: '700' }]}>✓ Approved & Verified Partner</Text>
+                                <Text style={styles.ngoDetailsLabel}>Location Address:</Text>
+                                <Text style={styles.ngoDetailsVal}>{m.ngo_address}</Text>
+                                <Text style={styles.ngoDetailsLabel}>Accepted donation types:</Text>
+                                <Text style={styles.ngoDetailsVal}>Food, Clothes, Books, Money</Text>
+                                {m.matchingReq && (
+                                  <>
+                                    <Text style={styles.ngoDetailsLabel}>Active Requirement description:</Text>
+                                    <Text style={styles.ngoDetailsVal}>{m.matchingReq.description}</Text>
+                                    <Text style={styles.ngoDetailsLabel}>Urgency:</Text>
+                                    <Text style={[styles.ngoDetailsVal, { color: URGENCY_COLORS[m.urgency] || Colors.primary, fontWeight: '700' }]}>{m.urgency?.toUpperCase()}</Text>
+                                  </>
+                                )}
+                                <TouchableOpacity style={[styles.selectNgoBtn, isSelected && styles.selectNgoBtnActive]} onPress={() => setSelectedNGO(m)}>
+                                  <Text style={styles.selectNgoBtnText}>{isSelected ? '✓ NGO Selected' : 'Select This NGO'}</Text>
+                                </TouchableOpacity>
+                              </View>
+                            )}
                           </View>
-                        )}
-                      </View>
-                    );
-                  })}
+                        );
+                      })}
+                    </View>
+                  )}
 
-                  <TouchableOpacity
-                    style={[styles.nextBtn, !selectedNGO && styles.nextBtnDisabled]}
-                    onPress={() => selectedNGO && setStep(4)}
-                    disabled={!selectedNGO}
-                  >
-                    <Text style={styles.nextBtnText}>Confirm NGO →</Text>
-                  </TouchableOpacity>
-                </>
+                  {/* 2. Nearby Verified NGOs */}
+                  {categories.nearbyNgos.length > 0 && (
+                    <View style={styles.categoryContainer}>
+                      <Text style={styles.categoryTitle}>📍 NEARBY VERIFIED NGOs</Text>
+                      {categories.nearbyNgos.map((m) => {
+                        const isExpanded = expandedNgoId === m.ngo_id;
+                        const isSelected = selectedNGO?.ngo_id === m.ngo_id;
+                        return (
+                          <View key={m.ngo_id} style={[styles.ngoCard, isSelected && styles.ngoCardSelected]}>
+                            <TouchableOpacity style={styles.ngoCardHeaderTouchable} onPress={() => setExpandedNgoId(isExpanded ? null : m.ngo_id)}>
+                              <View style={styles.ngoCardHeader}>
+                                <Text style={styles.ngoName}>{m.ngo_name}</Text>
+                                <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={Colors.textSecondary} />
+                              </View>
+                              <View style={styles.ngoMeta}>
+                                <View style={styles.metaItem}>
+                                  <Ionicons name="location-outline" size={14} color={Colors.textSecondary} />
+                                  <Text style={styles.metaText}>{m.distance_km.toFixed(1)} km away</Text>
+                                </View>
+                                <View style={styles.metaItem}>
+                                  <Ionicons name="checkmark-circle-outline" size={14} color={Colors.success} />
+                                  <Text style={[styles.metaText, { color: Colors.success, fontWeight: '700' }]}>Verified</Text>
+                                </View>
+                                <View style={styles.metaItem}>
+                                  <Ionicons name="analytics-outline" size={14} color={Colors.primary} />
+                                  <Text style={[styles.metaText, { color: Colors.primary, fontWeight: '700' }]}>{Math.round(m.score * 100)}% Match</Text>
+                                </View>
+                              </View>
+                              {m.reason && <Text style={styles.recommendationReason}>🤖 {m.reason}</Text>}
+                            </TouchableOpacity>
+                            {isExpanded && (
+                              <View style={styles.ngoDetailsExpand}>
+                                <Text style={styles.ngoDetailsLabel}>Verification Status:</Text>
+                                <Text style={[styles.ngoDetailsVal, { color: Colors.success, fontWeight: '700' }]}>✓ Approved & Verified Partner</Text>
+                                <Text style={styles.ngoDetailsLabel}>Location Address:</Text>
+                                <Text style={styles.ngoDetailsVal}>{m.ngo_address}</Text>
+                                <Text style={styles.ngoDetailsLabel}>Accepted donation types:</Text>
+                                <Text style={styles.ngoDetailsVal}>Food, Clothes, Books, Money</Text>
+                                <TouchableOpacity style={[styles.selectNgoBtn, isSelected && styles.selectNgoBtnActive]} onPress={() => setSelectedNGO(m)}>
+                                  <Text style={styles.selectNgoBtnText}>{isSelected ? '✓ NGO Selected' : 'Select This NGO'}</Text>
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+
+                  {/* 3. Other Verified NGOs */}
+                  {categories.otherNgos.length > 0 && (
+                    <View style={styles.categoryContainer}>
+                      <Text style={styles.categoryTitle}>🏢 OTHER VERIFIED NGOs</Text>
+                      {categories.otherNgos.map((m) => {
+                        const isExpanded = expandedNgoId === m.ngo_id;
+                        const isSelected = selectedNGO?.ngo_id === m.ngo_id;
+                        return (
+                          <View key={m.ngo_id} style={[styles.ngoCard, isSelected && styles.ngoCardSelected]}>
+                            <TouchableOpacity style={styles.ngoCardHeaderTouchable} onPress={() => setExpandedNgoId(isExpanded ? null : m.ngo_id)}>
+                              <View style={styles.ngoCardHeader}>
+                                <Text style={styles.ngoName}>{m.ngo_name}</Text>
+                                <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={Colors.textSecondary} />
+                              </View>
+                              <View style={styles.ngoMeta}>
+                                <View style={styles.metaItem}>
+                                  <Ionicons name="location-outline" size={14} color={Colors.textSecondary} />
+                                  <Text style={styles.metaText}>{m.distance_km.toFixed(1)} km away</Text>
+                                </View>
+                                <View style={styles.metaItem}>
+                                  <Ionicons name="checkmark-circle-outline" size={14} color={Colors.success} />
+                                  <Text style={[styles.metaText, { color: Colors.success, fontWeight: '700' }]}>Verified</Text>
+                                </View>
+                                <View style={styles.metaItem}>
+                                  <Ionicons name="analytics-outline" size={14} color={Colors.primary} />
+                                  <Text style={[styles.metaText, { color: Colors.primary, fontWeight: '700' }]}>{Math.round(m.score * 100)}% Match</Text>
+                                </View>
+                              </View>
+                              {m.reason && <Text style={styles.recommendationReason}>🤖 {m.reason}</Text>}
+                            </TouchableOpacity>
+                            {isExpanded && (
+                              <View style={styles.ngoDetailsExpand}>
+                                <Text style={styles.ngoDetailsLabel}>Verification Status:</Text>
+                                <Text style={[styles.ngoDetailsVal, { color: Colors.success, fontWeight: '700' }]}>✓ Approved & Verified Partner</Text>
+                                <Text style={styles.ngoDetailsLabel}>Location Address:</Text>
+                                <Text style={styles.ngoDetailsVal}>{m.ngo_address}</Text>
+                                <Text style={styles.ngoDetailsLabel}>Accepted donation types:</Text>
+                                <Text style={styles.ngoDetailsVal}>Food, Clothes, Books, Money</Text>
+                                <TouchableOpacity style={[styles.selectNgoBtn, isSelected && styles.selectNgoBtnActive]} onPress={() => setSelectedNGO(m)}>
+                                  <Text style={styles.selectNgoBtnText}>{isSelected ? '✓ NGO Selected' : 'Select This NGO'}</Text>
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+                </ScrollView>
               )}
+
+              <View style={styles.stepButtons}>
+                <TouchableOpacity style={styles.backBtn} onPress={() => setStep(2)}>
+                  <Text style={styles.backBtnText}>← Back</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.nextBtn, !selectedNGO && styles.nextBtnDisabled]}
+                  onPress={() => selectedNGO && setStep(4)}
+                  disabled={!selectedNGO}
+                >
+                  <Text style={styles.nextBtnText}>Confirm NGO →</Text>
+                </TouchableOpacity>
+              </View>
             </>
           )}
 
@@ -838,5 +1079,44 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.text,
     textTransform: 'capitalize',
+  },
+  categoryContainer: {
+    marginBottom: Spacing.md,
+  },
+  categoryTitle: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '800',
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+    letterSpacing: 0.5,
+    marginTop: Spacing.sm,
+  },
+  recommendationReason: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.primary,
+    fontStyle: 'italic',
+    marginTop: Spacing.xs,
+    fontWeight: '600',
+  },
+  errorBox: {
+    alignItems: 'center',
+    padding: Spacing.xl,
+  },
+  errorText: {
+    color: Colors.emergency,
+    fontWeight: '600',
+    fontSize: Typography.fontSize.sm,
+    textAlign: 'center',
+  },
+  retryBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 8,
+    marginTop: Spacing.md,
+  },
+  retryBtnText: {
+    color: '#FFF',
+    fontWeight: '700',
   },
 });
