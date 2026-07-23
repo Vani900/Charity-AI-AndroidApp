@@ -1,0 +1,85 @@
+name: CharityAI — 500-Test Android Appium E2E Pipeline
+
+on:
+  push:
+    branches: [ main, master, dev ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  android-e2e:
+    runs-on: macos-13 # macOS runners support hardware acceleration for emulators
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Install Application Dependencies
+        run: |
+          npm install
+
+      - name: Install Test Suite Dependencies
+        run: |
+          cd e2e-tests
+          npm install
+
+      - name: Build Android Debug APK
+        run: |
+          # Build locally or compile gradle wrapper assemblies
+          if [ -d "android" ]; then
+            cd android
+            chmod +x gradlew
+            ./gradlew assembleDebug
+            cd ..
+            cp android/app/build/outputs/apk/debug/app-debug.apk app-release.apk
+          else
+            echo "Gradle build directory not found. Reusing prebuilt app-release.apk..."
+          fi
+
+      - name: Run E2E Test Suite inside Android Emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          target: google_apis
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            # Start Appium Server in the background
+            npm install -g appium
+            appium driver install uiautomator2
+            appium --port 4723 --log appium.log &
+            
+            # Wait for Appium to start
+            until curl -s http://localhost:4723/status > /dev/null; do
+              echo "Waiting for Appium server to wake up..."
+              sleep 2
+            done
+            echo "Appium is ready."
+            
+            # Execute the E2E Test suite
+            cd e2e-tests
+            npm test
+
+      - name: Upload Test Reports as Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: charityai-e2e-reports
+          path: |
+            e2e-tests/reports/test-report.xlsx
+            e2e-tests/reports/execution-report.html

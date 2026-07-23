@@ -1,0 +1,22 @@
+{
+  "name": "charityai-mobile-e2e-tests",
+  "version": "1.0.0",
+  "description": "Android mobile E2E tests for CharityAI using Appium and WebdriverIO",
+  "main": "run_e2e.js",
+  "scripts": {
+    "test": "node run_e2e.js",
+    "test:appium": "wdio run wdio.conf.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "exceljs": "^4.4.0"
+  },
+  "devDependencies": {
+    "@wdio/cli": "^8.39.0",
+    "@wdio/local-runner": "^8.39.0",
+    "@wdio/mocha-framework": "^8.38.0",
+    "@wdio/spec-reporter": "^8.38.0",
+    "appium": "^2.11.3",
+    "appium-uiautomator2-driver": "^3.7.7"
+  }
+}
