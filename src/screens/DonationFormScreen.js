@@ -41,8 +41,11 @@ export default function DonationFormScreen({ route, navigation }) {
   const [selectedPayment, setSelectedPayment] = useState('UPI');
   const [explicitlyConfirmed, setExplicitlyConfirmed] = useState(false);
   const [foodType, setFoodType] = useState('veg');
-  const [clothesGender, setClothesGender] = useState('men');
-  const [clothesAgeGroup, setClothesAgeGroup] = useState('adult');
+  const [clothesCategory, setClothesCategory] = useState('adult');
+  const [adultGender, setAdultGender] = useState('men');
+  const [adultSize, setAdultSize] = useState('M');
+  const [kidsGender, setKidsGender] = useState('boy');
+  const [kidsAge, setKidsAge] = useState('');
 
   const [matchingNgos, setMatchingNgos] = useState([]);
   const [categories, setCategories] = useState({ bestMatches: [], nearbyNgos: [], otherNgos: [] });
@@ -249,7 +252,9 @@ export default function DonationFormScreen({ route, navigation }) {
     const finalDescription = selectedType === 'food'
       ? `[Food Type: ${foodType.toUpperCase()}] Donation of ${quantity} food resource.`
       : selectedType === 'clothes'
-      ? `[Gender: ${clothesGender.toUpperCase()}, Size/Age: ${clothesAgeGroup.toUpperCase()}] Donation of ${quantity} clothes resource.`
+      ? clothesCategory === 'adult'
+        ? `[Category: ADULT, Gender: ${adultGender.toUpperCase()}, Size: ${adultSize}] Donation of ${quantity} clothes resource.`
+        : `[Category: KIDS, Gender: ${kidsGender.toUpperCase()}, Age: ${kidsAge || 'Not specified'}] Donation of ${quantity} clothes resource.`
       : `Donation of ${quantity} ${selectedType} resource.`;
     dispatch(fetchMatches({
       resource_type: selectedType,
@@ -266,7 +271,9 @@ export default function DonationFormScreen({ route, navigation }) {
     const finalDescription = selectedType === 'food'
       ? `[Food Type: ${foodType.toUpperCase()}] Donation of ${quantity} food resource.`
       : selectedType === 'clothes'
-      ? `[Gender: ${clothesGender.toUpperCase()}, Size/Age: ${clothesAgeGroup.toUpperCase()}] Donation of ${quantity} clothes resource.`
+      ? clothesCategory === 'adult'
+        ? `[Category: ADULT, Gender: ${adultGender.toUpperCase()}, Size: ${adultSize}] Donation of ${quantity} clothes resource.`
+        : `[Category: KIDS, Gender: ${kidsGender.toUpperCase()}, Age: ${kidsAge || 'Not specified'}] Donation of ${quantity} clothes resource.`
       : `Donation of ${quantity} ${selectedType} resource.`;
 
     const formData = new FormData();
@@ -403,60 +410,119 @@ export default function DonationFormScreen({ route, navigation }) {
                       </TouchableOpacity>
                     ))}
                   </View>
-                </View>
-              )}
-
-              {selectedType === 'clothes' && (
+                              {selectedType === 'clothes' && (
                 <>
                   <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Gender *</Text>
+                    <Text style={styles.label}>Clothes Category *</Text>
                     <View style={{ flexDirection: 'row', gap: Spacing.md }}>
-                      {['men', 'women'].map((gender) => (
+                      {['adult', 'kids'].map((cat) => (
                         <TouchableOpacity
-                          key={gender}
+                          key={cat}
                           style={[
                             styles.foodTypeBtn,
-                            clothesGender === gender && styles.foodTypeBtnActive
+                            clothesCategory === cat && styles.foodTypeBtnActive
                           ]}
-                          onPress={() => setClothesGender(gender)}
+                          onPress={() => setClothesCategory(cat)}
                         >
                           <Ionicons
-                            name={clothesGender === gender ? "radio-button-on" : "radio-button-off"}
+                            name={clothesCategory === cat ? "radio-button-on" : "radio-button-off"}
                             size={18}
-                            color={clothesGender === gender ? Colors.primary : Colors.textSecondary}
+                            color={clothesCategory === cat ? Colors.primary : Colors.textSecondary}
                           />
-                          <Text style={[styles.foodTypeLabel, clothesGender === gender && { color: Colors.primary }]}>
-                            {gender === 'men' ? 'Men ♂️' : 'Women ♀️'}
+                          <Text style={[styles.foodTypeLabel, clothesCategory === cat && { color: Colors.primary }]}>
+                            {cat === 'adult' ? 'Adult 🧑' : 'Kids 🧒'}
                           </Text>
                         </TouchableOpacity>
                       ))}
                     </View>
                   </View>
 
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Size Category / Age *</Text>
-                    <View style={{ flexDirection: 'row', gap: Spacing.md }}>
-                      {['adult', 'kids'].map((age) => (
-                        <TouchableOpacity
-                          key={age}
-                          style={[
-                            styles.foodTypeBtn,
-                            clothesAgeGroup === age && styles.foodTypeBtnActive
-                          ]}
-                          onPress={() => setClothesAgeGroup(age)}
-                        >
-                          <Ionicons
-                            name={clothesAgeGroup === age ? "radio-button-on" : "radio-button-off"}
-                            size={18}
-                            color={clothesAgeGroup === age ? Colors.primary : Colors.textSecondary}
-                          />
-                          <Text style={[styles.foodTypeLabel, clothesAgeGroup === age && { color: Colors.primary }]}>
-                            {age === 'adult' ? 'Adult 🧑' : 'Kids 🧒'}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
+                  {clothesCategory === 'adult' ? (
+                    <>
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Gender *</Text>
+                        <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+                          {['men', 'women'].map((gender) => (
+                            <TouchableOpacity
+                              key={gender}
+                              style={[
+                                styles.foodTypeBtn,
+                                adultGender === gender && styles.foodTypeBtnActive
+                              ]}
+                              onPress={() => setAdultGender(gender)}
+                            >
+                              <Ionicons
+                                name={adultGender === gender ? "radio-button-on" : "radio-button-off"}
+                                size={18}
+                                color={adultGender === gender ? Colors.primary : Colors.textSecondary}
+                              />
+                              <Text style={[styles.foodTypeLabel, adultGender === gender && { color: Colors.primary }]}>
+                                {gender === 'men' ? 'Men ♂️' : 'Women ♀️'}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </View>
+
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Dress Size *</Text>
+                        <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+                          {['S', 'M', 'L', 'XL'].map((size) => (
+                            <TouchableOpacity
+                              key={size}
+                              style={[
+                                styles.sizeChip,
+                                adultSize === size && styles.sizeChipActive
+                              ]}
+                              onPress={() => setAdultSize(size)}
+                            >
+                              <Text style={[styles.sizeChipText, adultSize === size && { color: Colors.primary }]}>
+                                {size}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Gender *</Text>
+                        <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+                          {['boy', 'girl'].map((gender) => (
+                            <TouchableOpacity
+                              key={gender}
+                              style={[
+                                styles.foodTypeBtn,
+                                kidsGender === gender && styles.foodTypeBtnActive
+                              ]}
+                              onPress={() => setKidsGender(gender)}
+                            >
+                              <Ionicons
+                                name={kidsGender === gender ? "radio-button-on" : "radio-button-off"}
+                                size={18}
+                                color={kidsGender === gender ? Colors.primary : Colors.textSecondary}
+                              />
+                              <Text style={[styles.foodTypeLabel, kidsGender === gender && { color: Colors.primary }]}>
+                                {gender === 'boy' ? 'Boy 👦' : 'Girl 👧'}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </View>
+
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Kids Age * (e.g. 5-6 years)</Text>
+                        <TextInput
+                          style={styles.input}
+                          placeholder="e.g. 5-6 years, 10 years"
+                          placeholderTextColor={Colors.textLight}
+                          value={kidsAge}
+                          onChangeText={setKidsAge}
+                        />
+                      </View>
+                    </>
+                  )}
                 </>
               )}
 
@@ -1133,5 +1199,24 @@ const styles = StyleSheet.create({
   retryBtnText: {
     color: '#FFF',
     fontWeight: '700',
+  },
+  sizeChip: {
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 55,
+  },
+  sizeChipActive: {
+    borderColor: Colors.primary,
+    backgroundColor: '#F0FDF4',
+  },
+  sizeChipText: {
+    fontWeight: '700',
+    color: Colors.text,
   },
 });
