@@ -41,6 +41,8 @@ export default function DonationFormScreen({ route, navigation }) {
   const [selectedPayment, setSelectedPayment] = useState('UPI');
   const [explicitlyConfirmed, setExplicitlyConfirmed] = useState(false);
   const [foodType, setFoodType] = useState('veg');
+  const [clothesGender, setClothesGender] = useState('men');
+  const [clothesAgeGroup, setClothesAgeGroup] = useState('adult');
 
   const [matchingNgos, setMatchingNgos] = useState([]);
   const [categories, setCategories] = useState({ bestMatches: [], nearbyNgos: [], otherNgos: [] });
@@ -246,6 +248,8 @@ export default function DonationFormScreen({ route, navigation }) {
     setStep(3);
     const finalDescription = selectedType === 'food'
       ? `[Food Type: ${foodType.toUpperCase()}] Donation of ${quantity} food resource.`
+      : selectedType === 'clothes'
+      ? `[Gender: ${clothesGender.toUpperCase()}, Size/Age: ${clothesAgeGroup.toUpperCase()}] Donation of ${quantity} clothes resource.`
       : `Donation of ${quantity} ${selectedType} resource.`;
     dispatch(fetchMatches({
       resource_type: selectedType,
@@ -261,6 +265,8 @@ export default function DonationFormScreen({ route, navigation }) {
 
     const finalDescription = selectedType === 'food'
       ? `[Food Type: ${foodType.toUpperCase()}] Donation of ${quantity} food resource.`
+      : selectedType === 'clothes'
+      ? `[Gender: ${clothesGender.toUpperCase()}, Size/Age: ${clothesAgeGroup.toUpperCase()}] Donation of ${quantity} clothes resource.`
       : `Donation of ${quantity} ${selectedType} resource.`;
 
     const formData = new FormData();
@@ -400,25 +406,59 @@ export default function DonationFormScreen({ route, navigation }) {
                 </View>
               )}
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Photos / Proof of Donation (optional, max 3)</Text>
-                <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
-                  <Ionicons name="camera-outline" size={24} color={Colors.primary} style={{ marginRight: 8 }} />
-                  <Text style={styles.imagePickerBtnText}>Select or Capture Photo</Text>
-                </TouchableOpacity>
-                {images.length > 0 && (
-                  <View style={styles.imagesGrid}>
-                    {images.map((uri, idx) => (
-                      <View key={idx} style={styles.imageContainer}>
-                        <Image source={{ uri }} style={styles.imagePreview} />
-                        <TouchableOpacity style={styles.removeImageBtn} onPress={() => setImages(images.filter((_, i) => i !== idx))}>
-                          <Ionicons name="close-circle" size={22} color={Colors.error} />
+              {selectedType === 'clothes' && (
+                <>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Gender *</Text>
+                    <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+                      {['men', 'women'].map((gender) => (
+                        <TouchableOpacity
+                          key={gender}
+                          style={[
+                            styles.foodTypeBtn,
+                            clothesGender === gender && styles.foodTypeBtnActive
+                          ]}
+                          onPress={() => setClothesGender(gender)}
+                        >
+                          <Ionicons
+                            name={clothesGender === gender ? "radio-button-on" : "radio-button-off"}
+                            size={18}
+                            color={clothesGender === gender ? Colors.primary : Colors.textSecondary}
+                          />
+                          <Text style={[styles.foodTypeLabel, clothesGender === gender && { color: Colors.primary }]}>
+                            {gender === 'men' ? 'Men ♂️' : 'Women ♀️'}
+                          </Text>
                         </TouchableOpacity>
-                      </View>
-                    ))}
+                      ))}
+                    </View>
                   </View>
-                )}
-              </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Size Category / Age *</Text>
+                    <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+                      {['adult', 'kids'].map((age) => (
+                        <TouchableOpacity
+                          key={age}
+                          style={[
+                            styles.foodTypeBtn,
+                            clothesAgeGroup === age && styles.foodTypeBtnActive
+                          ]}
+                          onPress={() => setClothesAgeGroup(age)}
+                        >
+                          <Ionicons
+                            name={clothesAgeGroup === age ? "radio-button-on" : "radio-button-off"}
+                            size={18}
+                            color={clothesAgeGroup === age ? Colors.primary : Colors.textSecondary}
+                          />
+                          <Text style={[styles.foodTypeLabel, clothesAgeGroup === age && { color: Colors.primary }]}>
+                            {age === 'adult' ? 'Adult 🧑' : 'Kids 🧒'}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                </>
+              )}
 
               <View style={styles.stepButtons}>
                 <TouchableOpacity style={styles.backBtn} onPress={() => setStep(1)}>
