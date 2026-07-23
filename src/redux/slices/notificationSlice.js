@@ -7,12 +7,12 @@ import { notificationsAPI } from '../../services/api';
 
 export const fetchNotifications = createAsyncThunk('notifications/fetch', async (unreadOnly = false) => {
   const { data } = await notificationsAPI.getAll(unreadOnly);
-  return data;
+  return data.data || data;
 });
 
 export const fetchUnreadCount = createAsyncThunk('notifications/unreadCount', async () => {
   const { data } = await notificationsAPI.getUnreadCount();
-  return data.unread_count;
+  return data.data?.unread_count !== undefined ? data.data.unread_count : (data.unread_count || 0);
 });
 
 export const markNotificationRead = createAsyncThunk('notifications/markRead', async (id) => {

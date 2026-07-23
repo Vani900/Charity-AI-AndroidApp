@@ -104,10 +104,10 @@ export const emergencyAPI = {
 
 // ── Notifications ─────────────────────────────────────────────────────────────
 export const notificationsAPI = {
-  getAll: () => Promise.resolve({ data: { success: true, data: [] } }),
-  markRead: () => Promise.resolve({ data: { success: true } }),
-  markAllRead: () => Promise.resolve({ data: { success: true } }),
-  getUnreadCount: () => Promise.resolve({ data: { success: true, data: 0 } }),
+  getAll: () => api.get('/notifications'),
+  markRead: (id) => api.put(`/notifications/${id}/read`),
+  markAllRead: () => api.put('/notifications/read-all'),
+  getUnreadCount: () => api.get('/notifications/unread-count'),
 };
 
 // ── Blockchain ────────────────────────────────────────────────────────────────
