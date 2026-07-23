@@ -789,7 +789,17 @@ export default function DonationFormScreen({ route, navigation }) {
                 </View>
                 <View style={styles.summaryRow}>
                   <Text style={styles.summaryKey}>Donation Details</Text>
-                  <Text style={styles.summaryVal} numberOfLines={1}>{description}</Text>
+                  <Text style={styles.summaryVal} numberOfLines={1}>
+                    {selectedType === 'food'
+                      ? `[Food Type: ${foodType.toUpperCase()}] Donation of ${quantity} food resource.`
+                      : selectedType === 'clothes'
+                      ? clothesCategory === 'adult'
+                        ? `[Category: ADULT, Gender: ${adultGender.toUpperCase()}, Size: ${adultSize}]`
+                        : `[Category: KIDS, Gender: ${kidsGender.toUpperCase()}, Age: ${kidsAge || 'Not specified'}]`
+                      : selectedType === 'books'
+                      ? `[Class/Grade: ${booksClass || 'Not specified'}]`
+                      : `Donation of ${quantity} ${selectedType} resource.`}
+                  </Text>
                 </View>
                 <View style={styles.summaryRow}>
                   <Text style={styles.summaryKey}>Quantity/Amount</Text>
@@ -803,15 +813,19 @@ export default function DonationFormScreen({ route, navigation }) {
                 </View>
                 <View style={styles.summaryRow}>
                   <Text style={styles.summaryKey}>Selected NGO</Text>
-                  <Text style={[styles.summaryVal, { color: Colors.primary }]}>{selectedNGO?.ngo_name || 'Auto-matched'}</Text>
+                  <Text style={[styles.summaryVal, { color: Colors.primary }]}>
+                    {selectedNGO?.ngo_name || selectedNGO?.name || 'Unassigned (General Donation)'}
+                  </Text>
                 </View>
                 <View style={styles.summaryRow}>
                   <Text style={styles.summaryKey}>NGO Verification</Text>
-                  <Text style={[styles.summaryVal, { color: Colors.success }]}>✓ Verified Partner</Text>
+                  <Text style={[styles.summaryVal, { color: selectedNGO ? Colors.success : Colors.textSecondary }]}>
+                    {selectedNGO ? '✓ Verified Partner' : 'Not Applicable'}
+                  </Text>
                 </View>
                 <View style={styles.summaryRow}>
                   <Text style={styles.summaryKey}>NGO Location</Text>
-                  <Text style={styles.summaryVal}>{selectedNGO?.ngo_address || 'Chennai Partner Office'}</Text>
+                  <Text style={styles.summaryVal}>{selectedNGO?.ngo_address || selectedNGO?.address || 'N/A'}</Text>
                 </View>
                 <View style={styles.summaryRow}>
                   <Text style={styles.summaryKey}>Urgency Status</Text>
