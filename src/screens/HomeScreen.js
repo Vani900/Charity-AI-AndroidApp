@@ -22,8 +22,6 @@ const DONATION_TYPES = [
   { type: 'food', label: 'Food', color: Colors.food },
   { type: 'clothes', label: 'Clothes', color: Colors.clothes },
   { type: 'books', label: 'Books', color: Colors.books },
-  { type: 'medicines', label: 'Medicines', color: Colors.medicines },
-  { type: 'blood', label: 'Blood', color: Colors.blood },
 ];
 
 export default function HomeScreen({ navigation }) {

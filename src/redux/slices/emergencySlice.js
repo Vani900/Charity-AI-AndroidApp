@@ -29,9 +29,7 @@ export const fetchEmergencyAlerts = createAsyncThunk(
       const defaultTypes = [
         { type: 'food', label: 'Food', icon: '🍲' },
         { type: 'clothes', label: 'Clothes', icon: '👕' },
-        { type: 'medicines', label: 'Medicines', icon: '💊' },
         { type: 'books', label: 'Books', icon: '📚' },
-        { type: 'blood', label: 'Blood', icon: '🩸' },
       ];
 
       return { alerts: activeAlerts, emergency_types: defaultTypes };

@@ -20,7 +20,7 @@ const SLIDES = [
   },
   {
     id: '2', emoji: '🚨', title: 'Emergency Mode',
-    subtitle: 'Get real-time alerts for blood needs, flood relief, and medical emergencies near you. Act instantly.',
+    subtitle: 'Get real-time alerts for flood relief, food shortages, and critical emergencies near you. Act instantly.',
     gradient: ['#B91C1C', '#EF4444'],
   },
   {
