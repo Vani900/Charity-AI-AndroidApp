@@ -76,6 +76,7 @@ export const ngosAPI = {
   getDashboard: () => api.get('/ngo/dashboard'),
   createRequest: (data) => api.post('/ngo/requirements', data),
   getRequests: () => api.get('/ngo/requirements'),
+  getRequirements: () => api.get('/ngo/requirements'),
   updateStatus: (id, status, note, longitude, latitude) =>
     api.put(`/ngo/donations/${id}/status`, { status, note, longitude, latitude }),
   uploadDocs: (formData) => api.post('/ngo/upload-docs', formData, {

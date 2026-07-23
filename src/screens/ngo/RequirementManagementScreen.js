@@ -10,7 +10,7 @@ import { ngosAPI } from '../../services/api';
 import { Colors, Typography, Spacing, BorderRadius, Shadows, DonationTypeIcons } from '../../utils/theme';
 
 const URGENCY_LEVELS = ['low', 'medium', 'high', 'critical'];
-const RESOURCE_TYPES = ['money', 'food', 'clothes', 'books', 'medicines', 'blood'];
+const RESOURCE_TYPES = ['money', 'food', 'clothes', 'books'];
 const URGENCY_COLORS = { low: Colors.success, medium: Colors.warning, high: Colors.accentOrange, critical: Colors.emergency };
 
 export default function RequirementManagementScreen() {
