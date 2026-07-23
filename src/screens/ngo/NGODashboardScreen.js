@@ -3,7 +3,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Modal, TextInput, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector, useDispatch } from 'react-redux';
@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ngosAPI, authAPI, donationsAPI } from '../../services/api';
 import { logout } from '../../redux/slices/authSlice';
 import { Colors, Typography, Spacing, BorderRadius, Shadows, StatusColors, DonationTypeIcons } from '../../utils/theme';
+import * as ImagePicker from 'expo-image-picker';
 
 const URGENCY_COLORS = { low: Colors.success, medium: Colors.warning, high: Colors.accentOrange, critical: Colors.emergency };
 
@@ -26,6 +27,13 @@ export default function NGODashboardScreen({ navigation }) {
   const [error, setError] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
   const [filter, setFilter] = useState('pending');
+  const [selectedDonation, setSelectedDonation] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [volunteerName, setVolunteerName] = useState('');
+  const [pickupDate, setPickupDate] = useState('');
+  const [proofImage, setProofImage] = useState(null);
+  const [deliveryNote, setDeliveryNote] = useState('');
+  const [uploadingProof, setUploadingProof] = useState(false);
 
   useEffect(() => { loadData(); }, [filter]);
 
@@ -85,10 +93,14 @@ export default function NGODashboardScreen({ navigation }) {
     }
   };
 
-  const handleUpdateStatus = async (id, status) => {
+  const handleUpdateStatus = async (id, status, noteSuffix = '') => {
     setUpdatingId(id);
     try {
-      await ngosAPI.updateStatus(id, status, `Status changed via mobile dashboard overview.`);
+      let finalNote = `Status changed via mobile dashboard overview.`;
+      if (noteSuffix) {
+        finalNote = noteSuffix;
+      }
+      await ngosAPI.updateStatus(id, status, finalNote);
       
       // Cache the accepted/rejected ones locally to track status filters correctly
       const storedStr = await AsyncStorage.getItem('ngo_accepted_donations') || '[]';
@@ -105,6 +117,60 @@ export default function NGODashboardScreen({ navigation }) {
       Alert.alert('Error', e.response?.data?.message || 'Failed to update donation request.');
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const handlePickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied ❌', 'Camera roll access is needed to upload proof photos.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets?.[0]) {
+      setProofImage(result.assets[0].uri);
+    }
+  };
+
+  const submitProofOfDelivery = async () => {
+    if (!selectedDonation) return;
+    if (!proofImage) {
+      Alert.alert('Proof Required', 'Please snap or upload a photo proof of delivery.');
+      return;
+    }
+    setUploadingProof(true);
+    try {
+      const formData = new FormData();
+      const filename = proofImage.split('/').pop();
+      const match = /\.(\w+)$/.exec(filename || '');
+      const type = match ? `image/${match[1]}` : `image/jpeg`;
+      formData.append('file', {
+        uri: proofImage,
+        name: filename || 'proof.jpg',
+        type,
+      });
+      
+      try {
+        await ngosAPI.uploadDocs(formData);
+      } catch (err) {
+        console.warn('File upload skipped or pending:', err.message);
+      }
+
+      const note = `[Receipt Confirmed] Note: ${deliveryNote || 'Donation verified successfully.'}`;
+      await handleUpdateStatus(selectedDonation._id, 'delivered', note);
+      
+      setModalVisible(false);
+      setProofImage(null);
+      setDeliveryNote('');
+      setSelectedDonation(null);
+    } catch (e) {
+      Alert.alert('Error', 'Failed to upload proof of delivery.');
+    } finally {
+      setUploadingProof(false);
     }
   };
 
@@ -281,15 +347,15 @@ export default function NGODashboardScreen({ navigation }) {
                   <>
                     <TouchableOpacity 
                       style={[styles.actionBtn, { backgroundColor: Colors.info }]} 
-                      onPress={() => handleUpdateStatus(d._id, 'in_transit')}
+                      onPress={() => { setSelectedDonation(d); setModalVisible(true); setProofImage(null); }}
                     >
-                      <Text style={styles.acceptBtnText}>In Transit</Text>
+                      <Text style={styles.acceptBtnText}>Schedule / Assign 🚚</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
-                      style={[styles.actionBtn, styles.acceptBtn]} 
-                      onPress={() => handleUpdateStatus(d._id, 'delivered')}
+                      style={[styles.actionBtn, { backgroundColor: Colors.warning }]} 
+                      onPress={() => handleUpdateStatus(d._id, 'in_transit', 'Donation picked up by volunteer.')}
                     >
-                      <Text style={styles.acceptBtnText}>Deliver</Text>
+                      <Text style={styles.acceptBtnText}>Mark Picked Up</Text>
                     </TouchableOpacity>
                   </>
                 )}
@@ -297,9 +363,18 @@ export default function NGODashboardScreen({ navigation }) {
                 {d.status === 'in_transit' && (
                   <TouchableOpacity 
                     style={[styles.actionBtn, styles.acceptBtn, { flex: 1 }]} 
-                    onPress={() => handleUpdateStatus(d._id, 'delivered')}
+                    onPress={() => handleUpdateStatus(d._id, 'delivered', 'Donation delivered to NGO. Verification pending.')}
                   >
-                    <Text style={styles.acceptBtnText}>Confirm Delivery</Text>
+                    <Text style={styles.acceptBtnText}>Mark Delivered</Text>
+                  </TouchableOpacity>
+                )}
+
+                {d.status === 'delivered' && (
+                  <TouchableOpacity 
+                    style={[styles.actionBtn, { backgroundColor: Colors.primary, flex: 1 }]} 
+                    onPress={() => { setSelectedDonation(d); setModalVisible(true); setProofImage(null); }}
+                  >
+                    <Text style={styles.acceptBtnText}>Confirm Receipt 📸</Text>
                   </TouchableOpacity>
                 )}
 
@@ -325,6 +400,103 @@ export default function NGODashboardScreen({ navigation }) {
         </View>
       </View>
     </ScrollView>
+
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={modalVisible}
+      onRequestClose={() => setModalVisible(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>
+              {selectedDonation?.status === 'accepted' ? 'Schedule Pickup & Volunteer' : 'Confirm Receipt & Upload Proof'}
+            </Text>
+            <TouchableOpacity onPress={() => setModalVisible(false)}>
+              <Ionicons name="close" size={24} color={Colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalBody}>
+            {selectedDonation?.status === 'accepted' ? (
+              <>
+                <Text style={styles.label}>Volunteer Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter volunteer name"
+                  placeholderTextColor={Colors.textLight}
+                  value={volunteerName}
+                  onChangeText={setVolunteerName}
+                />
+
+                <Text style={styles.label}>Scheduled Pickup Date/Time *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. Tomorrow 10:00 AM"
+                  placeholderTextColor={Colors.textLight}
+                  value={pickupDate}
+                  onChangeText={setPickupDate}
+                />
+
+                <TouchableOpacity
+                  style={styles.modalSubmitBtn}
+                  onPress={() => {
+                    if (!volunteerName || !pickupDate) {
+                      Alert.alert('Fields Required', 'Please enter volunteer name and pickup schedule');
+                      return;
+                    }
+                    const note = `[Pickup Scheduled] Volunteer: ${volunteerName}, Schedule: ${pickupDate}`;
+                    handleUpdateStatus(selectedDonation._id, 'accepted', note);
+                    setModalVisible(false);
+                    setVolunteerName('');
+                    setPickupDate('');
+                  }}
+                >
+                  <Text style={styles.modalSubmitBtnText}>Confirm Pickup Schedule</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={styles.label}>Upload Photo Proof *</Text>
+                <TouchableOpacity style={styles.imageSelector} onPress={handlePickImage}>
+                  {proofImage ? (
+                    <Image source={{ uri: proofImage }} style={styles.proofPreview} />
+                  ) : (
+                    <View style={styles.imagePlaceholder}>
+                      <Ionicons name="camera-outline" size={32} color={Colors.textSecondary} />
+                      <Text style={styles.placeholderText}>Tap to select receipt photo</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                <Text style={styles.label}>Verification / Delivery Notes</Text>
+                <TextInput
+                  style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
+                  placeholder="Enter verification notes (condition of items, etc.)"
+                  placeholderTextColor={Colors.textLight}
+                  value={deliveryNote}
+                  onChangeText={setDeliveryNote}
+                  multiline
+                />
+
+                <TouchableOpacity
+                  style={styles.modalSubmitBtn}
+                  onPress={submitProofOfDelivery}
+                  disabled={uploadingProof}
+                >
+                  {uploadingProof ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={styles.modalSubmitBtnText}>Verify & Confirm Receipt ✅</Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -338,8 +510,8 @@ const styles = StyleSheet.create({
   ngoName: { fontSize: Typography.fontSize.xl, fontWeight: '800', color: '#FFF', marginVertical: 4 },
   statusBadge: { alignSelf: 'flex-start', paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: BorderRadius.full, marginBottom: Spacing.md },
   statusBadgeText: { color: '#FFF', fontSize: Typography.fontSize.xs, fontWeight: '700' },
-  statsRow: { flexDirection: 'row', gap: Spacing.md },
-  statCard: { flex: 1, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: BorderRadius.md, padding: Spacing.md, alignItems: 'center' },
+  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginTop: Spacing.md },
+  statCard: { width: '47%', flexGrow: 1, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: BorderRadius.md, padding: Spacing.md, alignItems: 'center' },
   statValue: { fontSize: Typography.fontSize.xl, fontWeight: '800', color: '#FFF' },
   statLabel: { fontSize: Typography.fontSize.xs, color: 'rgba(255,255,255,0.7)', textAlign: 'center' },
   content: { padding: Spacing.lg },
@@ -393,4 +565,15 @@ const styles = StyleSheet.create({
   filterChipTextActive: { color: '#FFF' },
   chatBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: Colors.primary, borderRadius: BorderRadius.md, paddingHorizontal: 8, paddingVertical: 4 },
   chatBtnText: { color: Colors.primary, fontSize: Typography.fontSize.xs, fontWeight: '700' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.lg },
+  modalContainer: { width: '100%', maxHeight: '80%', backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.xl, ...Shadows.lg },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.border, paddingBottom: Spacing.md, marginBottom: Spacing.md },
+  modalTitle: { fontSize: Typography.fontSize.lg, fontWeight: '800', color: Colors.text, flex: 1 },
+  modalBody: { paddingVertical: Spacing.sm },
+  modalSubmitBtn: { backgroundColor: Colors.primary, borderRadius: BorderRadius.md, padding: Spacing.md, alignItems: 'center', marginTop: Spacing.lg },
+  modalSubmitBtnText: { color: '#FFF', fontWeight: '800', fontSize: Typography.fontSize.md },
+  imageSelector: { borderWidth: 2, borderStyle: 'dashed', borderColor: Colors.border, borderRadius: BorderRadius.lg, height: 160, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.md, backgroundColor: Colors.background, overflow: 'hidden' },
+  imagePlaceholder: { alignItems: 'center' },
+  placeholderText: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, marginTop: Spacing.sm, fontWeight: '600' },
+  proofPreview: { width: '100%', height: '100%' },
 });

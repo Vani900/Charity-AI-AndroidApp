@@ -10,6 +10,7 @@ import { Colors, Typography, Spacing, BorderRadius, Shadows, DonationTypeIcons }
 
 export default function NGOAnalyticsScreen() {
   const [stats, setStats] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -17,6 +18,7 @@ export default function NGOAnalyticsScreen() {
       .then(({ data: res }) => {
         if (res.success && res.data) {
           setStats(res.data.stats || []);
+          setAnalytics(res.data.analytics || null);
         }
       })
       .catch((e) => console.warn(e.message))
@@ -25,11 +27,7 @@ export default function NGOAnalyticsScreen() {
 
   if (loading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator size="large" color={Colors.primary} /></View>;
 
-  // Extract counts
-  const totalVal = stats.find(s => s.l === 'Total Donations')?.v || '0';
-  const pendingVal = stats.find(s => s.l === 'Pending')?.v || '0';
-  const deliveredVal = stats.find(s => s.l === 'Delivered')?.v || '0';
-  const successRate = stats.find(s => s.l === 'Success Rate')?.v || '0%';
+  const sum = (analytics?.foodCount || 0) + (analytics?.clothesCount || 0) + (analytics?.booksCount || 0) + (analytics?.moneyCount || 0) || 1;
 
   return (
     <ScrollView style={styles.container}>
@@ -53,10 +51,10 @@ export default function NGOAnalyticsScreen() {
         <View style={[styles.section, { marginTop: Spacing.xl }]}>
           <Text style={styles.sectionTitle}>Donations By Resource Type</Text>
           {[
-            { label: 'Food Intake Match', ratio: 0.65, count: '65%', color: Colors.primary },
-            { label: 'Clothes Distribution', ratio: 0.20, count: '20%', color: Colors.warning },
-            { label: 'Books Fulfillment', ratio: 0.10, count: '10%', color: Colors.info },
-            { label: 'Money Funding', ratio: 0.05, count: '5%', color: Colors.error },
+            { label: 'Food Intake Match', count: `${analytics?.foodCount || 0} Units`, ratio: (analytics?.foodCount || 0) / sum, color: Colors.primary },
+            { label: 'Clothes Distribution', count: `${analytics?.clothesCount || 0} Units`, ratio: (analytics?.clothesCount || 0) / sum, color: Colors.warning },
+            { label: 'Books Fulfillment', count: `${analytics?.booksCount || 0} Units`, ratio: (analytics?.booksCount || 0) / sum, color: Colors.info },
+            { label: 'Money Funding', count: `${analytics?.moneyCount || 0} Units`, ratio: (analytics?.moneyCount || 0) / sum, color: Colors.error },
           ].map((item, idx) => (
             <View key={idx} style={styles.resourceRow}>
               <View style={styles.resourceTop}>
@@ -64,7 +62,7 @@ export default function NGOAnalyticsScreen() {
                 <Text style={styles.resourceCount}>{item.count}</Text>
               </View>
               <View style={styles.bar}>
-                <View style={[styles.barFill, { width: `${item.ratio * 100}%`, backgroundColor: item.color }]} />
+                <View style={[styles.barFill, { width: `${Math.max(0.05, item.ratio) * 100}%`, backgroundColor: item.color }]} />
               </View>
             </View>
           ))}
@@ -91,10 +89,15 @@ export default function NGOAnalyticsScreen() {
           </View>
         </View>
 
-        {/* Beneficiaries Helped (Fallback message) */}
+        {/* Beneficiaries Helped */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Beneficiaries Helped</Text>
-          <Text style={styles.analyticsText}>Beneficiary tracking is currently not supported by the backend REST service.</Text>
+          <Text style={[styles.statusCount, { color: Colors.success, fontSize: 32 }]}>
+            {analytics?.beneficiariesCount || 0} 👤
+          </Text>
+          <Text style={[styles.analyticsText, { marginTop: Spacing.sm }]}>
+            Estimated number of beneficiaries supported via verified deliveries.
+          </Text>
         </View>
       </View>
     </ScrollView>
