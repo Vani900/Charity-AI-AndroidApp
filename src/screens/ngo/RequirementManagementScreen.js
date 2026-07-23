@@ -89,7 +89,9 @@ export default function RequirementManagementScreen({ navigation }) {
         ]
       );
     } catch (e) {
-      Alert.alert('Error', e.response?.data?.message || 'Failed to post requirement');
+      const isNetwork = !e.response || e.message?.includes('Network');
+      const msg = e.response?.data?.message || (isNetwork ? 'Network connection timeout. Please ensure the server is awake and try again.' : 'Failed to post requirement');
+      Alert.alert('Error', msg);
     } finally { setSubmitting(false); }
   };
 

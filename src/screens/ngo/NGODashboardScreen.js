@@ -87,7 +87,12 @@ export default function NGODashboardScreen({ navigation }) {
       }
     } catch (e) {
       console.warn('Failed to load NGO dashboard:', e.message);
-      setError('Failed to refresh data from server.');
+      if (e.response?.status === 401) {
+        dispatch(logout());
+      } else {
+        const isNetwork = !e.response || e.message?.includes('Network');
+        setError(isNetwork ? 'Network connection timeout. Please check your connection.' : 'Failed to refresh data from server.');
+      }
     } finally {
       setLoading(false); setRefreshing(false);
     }
@@ -193,7 +198,8 @@ export default function NGODashboardScreen({ navigation }) {
   const approvalStatus = ngo?.approvalStatus || 'pending';
 
   return (
-    <ScrollView style={styles.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor={Colors.primary} />}>
+    <>
+      <ScrollView style={styles.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor={Colors.primary} />}>
       <LinearGradient colors={[Colors.primaryDark, Colors.primary]} style={styles.header}>
         {/* Top actions bar */}
         <View style={styles.topBar}>
@@ -497,6 +503,7 @@ export default function NGODashboardScreen({ navigation }) {
         </View>
       </View>
     </Modal>
+    </>
   );
 }
 
