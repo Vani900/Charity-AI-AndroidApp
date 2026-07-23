@@ -410,7 +410,10 @@ export default function DonationFormScreen({ route, navigation }) {
                       </TouchableOpacity>
                     ))}
                   </View>
-                              {selectedType === 'clothes' && (
+                </View>
+              )}
+
+              {selectedType === 'clothes' && (
                 <>
                   <View style={styles.inputGroup}>
                     <Text style={styles.label}>Clothes Category *</Text>
