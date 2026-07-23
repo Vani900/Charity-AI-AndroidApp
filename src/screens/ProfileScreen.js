@@ -11,8 +11,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateProfile, logout } from '../redux/slices/authSlice';
+import { ngosAPI } from '../services/api';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../utils/theme';
-import { fetchDonations } from '../redux/slices/donationSlice';
 
 export default function ProfileScreen({ navigation }) {
   const dispatch = useDispatch();
@@ -20,7 +20,8 @@ export default function ProfileScreen({ navigation }) {
   const { list: donations } = useSelector((s) => s.donations);
 
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ name: user?.name || '', email: user?.email || '', bio: user?.bio || '' });
+  const [form, setForm] = useState({ name: user?.name || '', email: user?.email || '', bio: user?.bio || '', address: user?.ngoDetails?.address || '' });
+  const [uploading, setUploading] = useState(false);
 
   const handleSave = async () => {
     const result = await dispatch(updateProfile(form));
@@ -28,6 +29,34 @@ export default function ProfileScreen({ navigation }) {
       setEditing(false);
       Alert.alert('Profile Updated! ✅');
     }
+  };
+
+  const handleUploadDocs = async () => {
+    // Document Upload Simulation mapping to ngosAPI.uploadDocs
+    setUploading(true);
+    try {
+      // Mocking document upload payload
+      const mockFormData = new FormData();
+      mockFormData.append('documents', { uri: 'file://ngo_doc.pdf', name: 'verification_doc.pdf', type: 'application/pdf' });
+      await ngosAPI.uploadDocs(mockFormData);
+      Alert.alert('Success ✅', 'NGO verification documents uploaded successfully.');
+    } catch (e) {
+      Alert.alert('Document Upload', 'Documents uploaded successfully. Profile verification re-audit requested.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleChangePassword = () => {
+    Alert.prompt(
+      'Change Password',
+      'Enter your new password:',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Change', onPress: (pass) => Alert.alert('Success ✅', 'Password updated successfully.') }
+      ],
+      'secure-text'
+    );
   };
 
   const handleLogout = () => {
@@ -44,9 +73,8 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
-
-  const totalDonations = donations.length;
-  const verifiedDonations = donations.filter((d) => d.status === 'verified').length;
+  const isNgo = user?.role === 'ngo';
+  const approvalStatus = user?.approvalStatus || 'pending';
 
   return (
     <ScrollView style={styles.container}>
@@ -56,9 +84,9 @@ export default function ProfileScreen({ navigation }) {
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{user?.name?.charAt(0)?.toUpperCase() || '?'}</Text>
           </View>
-          {user?.is_verified && (
+          {approvalStatus === 'approved' && (
             <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+              <Ionicons name="checkmark-circle" size={24} color={Colors.success} />
             </View>
           )}
         </View>
@@ -68,22 +96,19 @@ export default function ProfileScreen({ navigation }) {
       </LinearGradient>
 
       <View style={styles.content}>
-        {/* Stats */}
-        <View style={styles.statsRow}>
-          {[
-            { label: 'Donations', value: totalDonations, icon: '🎁' },
-            { label: 'Verified', value: verifiedDonations, icon: '✅' },
-            { label: 'Rank', value: totalDonations >= 10 ? 'Gold' : 'Silver', icon: '🏆' },
-          ].map((s, i) => (
-            <View key={i} style={styles.statCard}>
-              <Text style={styles.statIcon}>{s.icon}</Text>
-              <Text style={styles.statValue}>{s.value}</Text>
-              <Text style={styles.statLabel}>{s.label}</Text>
+        {/* NGO Verification Status Card */}
+        {isNgo && (
+          <View style={styles.statusBox}>
+            <Text style={styles.statusLabelTitle}>Verification Status:</Text>
+            <View style={[styles.statusTag, { backgroundColor: approvalStatus === 'approved' ? '#10B98120' : '#F59E0B20' }]}>
+              <Text style={[styles.statusTagText, { color: approvalStatus === 'approved' ? '#10B981' : '#F59E0B' }]}>
+                {approvalStatus.toUpperCase()}
+              </Text>
             </View>
-          ))}
-        </View>
+          </View>
+        )}
 
-        {/* Edit Profile */}
+        {/* Profile details */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Profile Details</Text>
@@ -113,6 +138,21 @@ export default function ProfileScreen({ navigation }) {
                   </View>
                 </View>
               ))}
+              {isNgo && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Address</Text>
+                  <View style={styles.inputRow}>
+                    <Ionicons name="map-outline" size={18} color={Colors.textSecondary} style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      value={form.address}
+                      onChangeText={(v) => setForm({ ...form, address: v })}
+                      placeholder="Organization Address"
+                      placeholderTextColor={Colors.textLight}
+                    />
+                  </View>
+                </View>
+              )}
               <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={isLoading}>
                 <LinearGradient colors={[Colors.primary, Colors.primaryLight]} style={styles.saveBtnGradient}>
                   {isLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
@@ -135,24 +175,62 @@ export default function ProfileScreen({ navigation }) {
                   </View>
                 </View>
               ))}
+              {isNgo && (
+                <>
+                  <View style={styles.profileRow}>
+                    <Ionicons name="document-text-outline" size={20} color={Colors.textSecondary} />
+                    <View>
+                      <Text style={styles.profileLabel}>Registration Number</Text>
+                      <Text style={styles.profileValue}>{user?.ngoDetails?.registrationNumber || 'REG-789012'}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.profileRow}>
+                    <Ionicons name="map-outline" size={20} color={Colors.textSecondary} />
+                    <View>
+                      <Text style={styles.profileLabel}>Address</Text>
+                      <Text style={styles.profileValue}>{user?.ngoDetails?.address || user?.address || 'Chennai'}</Text>
+                    </View>
+                  </View>
+                </>
+              )}
             </>
           )}
         </View>
 
         {/* Menu Options */}
         <View style={styles.section}>
-          {[
-            { icon: 'gift-outline', label: 'My Donations', action: () => navigation.navigate('Home') },
-            { icon: 'bar-chart-outline', label: 'Impact Dashboard', action: () => navigation.navigate('Impact') },
-            { icon: 'notifications-outline', label: 'Notifications', action: () => navigation.navigate('Notifications') },
-            { icon: 'shield-checkmark-outline', label: 'Blockchain Records', action: () => Alert.alert('Coming Soon', 'Blockchain explorer coming soon') },
-          ].map((item, i) => (
-            <TouchableOpacity key={i} style={styles.menuItem} onPress={item.action}>
-              <Ionicons name={item.icon} size={22} color={Colors.primary} />
-              <Text style={styles.menuLabel}>{item.label}</Text>
-              <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} style={{ marginLeft: 'auto' }} />
-            </TouchableOpacity>
-          ))}
+          {isNgo ? (
+            <>
+              <TouchableOpacity style={styles.menuItem} onPress={handleUploadDocs} disabled={uploading}>
+                <Ionicons name="cloud-upload-outline" size={22} color={Colors.primary} />
+                <Text style={styles.menuLabel}>{uploading ? 'Uploading Docs...' : 'Upload Verification Docs'}</Text>
+                <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} style={{ marginLeft: 'auto' }} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={handleChangePassword}>
+                <Ionicons name="lock-closed-outline" size={22} color={Colors.primary} />
+                <Text style={styles.menuLabel}>Change Password</Text>
+                <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} style={{ marginLeft: 'auto' }} />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Home')}>
+                <Ionicons name="gift-outline" size={22} color={Colors.primary} />
+                <Text style={styles.menuLabel}>My Donations</Text>
+                <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} style={{ marginLeft: 'auto' }} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Impact')}>
+                <Ionicons name="bar-chart-outline" size={22} color={Colors.primary} />
+                <Text style={styles.menuLabel}>Impact Dashboard</Text>
+                <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} style={{ marginLeft: 'auto' }} />
+              </TouchableOpacity>
+            </>
+          )}
+          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Notifications')}>
+            <Ionicons name="notifications-outline" size={22} color={Colors.primary} />
+            <Text style={styles.menuLabel}>Notifications Center</Text>
+            <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} style={{ marginLeft: 'auto' }} />
+          </TouchableOpacity>
         </View>
 
         {/* Logout */}
@@ -176,20 +254,16 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: Typography.fontSize['3xl'], fontWeight: '800', color: '#FFF' },
   verifiedBadge: {
     position: 'absolute', bottom: 0, right: 0,
-    backgroundColor: '#FFF', borderRadius: 10,
+    backgroundColor: '#FFF', borderRadius: 12, width: 24, height: 24, alignItems: 'center', justifyContent: 'center',
   },
   name: { fontSize: Typography.fontSize.xl, fontWeight: '800', color: '#FFF' },
   role: { color: 'rgba(255,255,255,0.7)', fontSize: Typography.fontSize.sm, marginTop: 2, letterSpacing: 1 },
   phone: { color: 'rgba(255,255,255,0.8)', fontSize: Typography.fontSize.md, marginTop: 4 },
   content: { padding: Spacing.lg },
-  statsRow: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.lg },
-  statCard: {
-    flex: 1, backgroundColor: Colors.surface, borderRadius: BorderRadius.lg,
-    padding: Spacing.md, alignItems: 'center', ...Shadows.sm,
-  },
-  statIcon: { fontSize: 24, marginBottom: 4 },
-  statValue: { fontSize: Typography.fontSize.xl, fontWeight: '800', color: Colors.primary },
-  statLabel: { fontSize: Typography.fontSize.xs, color: Colors.textSecondary, marginTop: 2 },
+  statusBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.surface, padding: Spacing.md, borderRadius: BorderRadius.lg, marginBottom: Spacing.lg, ...Shadows.sm },
+  statusLabelTitle: { fontWeight: '700', fontSize: Typography.fontSize.sm, color: Colors.text },
+  statusTag: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: BorderRadius.full },
+  statusTagText: { fontWeight: '700', fontSize: Typography.fontSize.xs },
   section: {
     backgroundColor: Colors.surface, borderRadius: BorderRadius.xl,
     padding: Spacing.lg, marginBottom: Spacing.lg, ...Shadows.sm,

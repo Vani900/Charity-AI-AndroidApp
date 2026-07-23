@@ -6,14 +6,16 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ngosAPI, authAPI, donationsAPI } from '../../services/api';
+import { logout } from '../../redux/slices/authSlice';
 import { Colors, Typography, Spacing, BorderRadius, Shadows, StatusColors, DonationTypeIcons } from '../../utils/theme';
 
 const URGENCY_COLORS = { low: Colors.success, medium: Colors.warning, high: Colors.accentOrange, critical: Colors.emergency };
 
 export default function NGODashboardScreen({ navigation }) {
+  const dispatch = useDispatch();
   const { user } = useSelector((s) => s.auth);
   const [ngo, setNgo] = useState(null);
   const [stats, setStats] = useState([]);
@@ -106,6 +108,13 @@ export default function NGODashboardScreen({ navigation }) {
     }
   };
 
+  const handleLogout = () => {
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Logout', style: 'destructive', onPress: () => dispatch(logout()) },
+    ]);
+  };
+
   const viewRequestDetails = (d) => {
     Alert.alert(
       `${d.category?.toUpperCase()} Donation Details`,
@@ -120,6 +129,21 @@ export default function NGODashboardScreen({ navigation }) {
   return (
     <ScrollView style={styles.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor={Colors.primary} />}>
       <LinearGradient colors={[Colors.primaryDark, Colors.primary]} style={styles.header}>
+        {/* Top actions bar */}
+        <View style={styles.topBar}>
+          <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+            <Ionicons name="person-circle-outline" size={28} color="#FFF" />
+          </TouchableOpacity>
+          <View style={styles.topRightActions}>
+            <TouchableOpacity onPress={() => navigation.navigate('Notifications')} style={{ marginRight: Spacing.md }}>
+              <Ionicons name="notifications-outline" size={24} color="#FFF" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleLogout}>
+              <Ionicons name="log-out-outline" size={24} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <Text style={styles.welcome}>Welcome back,</Text>
         <Text style={styles.ngoName}>{ngo?.name || 'NGO'} 🏢</Text>
         <View style={[styles.statusBadge, { backgroundColor: '#10B981' }]}>
@@ -307,7 +331,9 @@ export default function NGODashboardScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header: { paddingTop: 60, paddingBottom: 30, paddingHorizontal: Spacing.xl },
+  header: { paddingTop: 40, paddingBottom: 30, paddingHorizontal: Spacing.xl },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md, paddingTop: 10 },
+  topRightActions: { flexDirection: 'row', alignItems: 'center' },
   welcome: { color: 'rgba(255,255,255,0.8)', fontSize: Typography.fontSize.md },
   ngoName: { fontSize: Typography.fontSize.xl, fontWeight: '800', color: '#FFF', marginVertical: 4 },
   statusBadge: { alignSelf: 'flex-start', paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: BorderRadius.full, marginBottom: Spacing.md },
@@ -357,9 +383,9 @@ const styles = StyleSheet.create({
   detailsBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: BorderRadius.md, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
   detailsBtnText: { color: Colors.text, fontWeight: '600', fontSize: Typography.fontSize.xs },
   acceptBtn: { backgroundColor: Colors.success },
-  acceptBtnText: { color: '#FFF', fontWeight: '700', fontSize: Typography.fontSize.xs },
+  acceptBtnText: { color: '#FFF', fontWeight: '700', fontSize: Typography.xs },
   rejectBtn: { backgroundColor: Colors.emergency },
-  rejectBtnText: { color: '#FFF', fontWeight: '700', fontSize: Typography.fontSize.xs },
+  rejectBtnText: { color: '#FFF', fontWeight: '700', fontSize: Typography.xs },
   filterRow: { flexDirection: 'row', gap: Spacing.xs, alignItems: 'center' },
   filterChip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: BorderRadius.full, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.background },
   filterChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },

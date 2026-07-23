@@ -1,5 +1,5 @@
 /**
- * NGO Navigator – stack screens for NGO module.
+ * NGO Navigator – tab screens wrapped in stack for NGO module.
  */
 
 import React from 'react';
@@ -14,6 +14,7 @@ import DonationRequestsScreen from '../screens/ngo/DonationRequestsScreen';
 import NGOAnalyticsScreen from '../screens/ngo/NGOAnalyticsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import DonationChatScreen from '../screens/DonationChatScreen';
+import NotificationCenterScreen from '../screens/NotificationCenterScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -27,7 +28,7 @@ function RequestsStack() {
   );
 }
 
-export default function NGONavigator() {
+function NGOTabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -53,5 +54,14 @@ export default function NGONavigator() {
       <Tab.Screen name="Analytics" component={NGOAnalyticsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
+  );
+}
+
+export default function NGONavigator() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="NGOTabs" component={NGOTabNavigator} />
+      <Stack.Screen name="Notifications" component={NotificationCenterScreen} />
+    </Stack.Navigator>
   );
 }
