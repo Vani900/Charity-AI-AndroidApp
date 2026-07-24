@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector, useDispatch } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useIsFocused } from '@react-navigation/native';
 import { ngosAPI, authAPI, donationsAPI } from '../../services/api';
 import { logout } from '../../redux/slices/authSlice';
 import { Colors, Typography, Spacing, BorderRadius, Shadows, StatusColors, DonationTypeIcons } from '../../utils/theme';
@@ -17,6 +18,7 @@ const URGENCY_COLORS = { low: Colors.success, medium: Colors.warning, high: Colo
 
 export default function NGODashboardScreen({ navigation }) {
   const dispatch = useDispatch();
+  const isFocused = useIsFocused();
   const { user } = useSelector((s) => s.auth);
   const [ngo, setNgo] = useState(null);
   const [stats, setStats] = useState([]);
@@ -35,67 +37,103 @@ export default function NGODashboardScreen({ navigation }) {
   const [deliveryNote, setDeliveryNote] = useState('');
   const [uploadingProof, setUploadingProof] = useState(false);
 
-  useEffect(() => { loadData(); }, [filter]);
+  // Reqs list states
+  const [reqsLoading, setReqsLoading] = useState(false);
+  const [reqsError, setReqsError] = useState(null);
+
+  useEffect(() => {
+    if (isFocused) {
+      loadData();
+    }
+  }, [isFocused, filter]);
 
   const loadData = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setError(null);
-      const [profileRes, dashRes, reqsRes] = await Promise.all([
-        authAPI.getMe(),
-        ngosAPI.getDashboard(),
-        ngosAPI.getRequirements(),
-      ]);
-      const currentNgo = profileRes.data?.data || null;
-      setNgo(currentNgo);
-      setRequirements(reqsRes.data?.data || reqsRes.data || []);
+      // 1. Fetch Profile
+      const profileRes = await authAPI.getMe();
+      setNgo(profileRes.data?.data || null);
 
+      // 2. Fetch Dashboard stats and pending requests
+      const dashRes = await ngosAPI.getDashboard();
       const fetchedStats = [...(dashRes.data?.data?.stats || [])];
-      const requirementsCount = (reqsRes.data?.data || reqsRes.data || []).length;
-      if (fetchedStats.length >= 3) {
-        fetchedStats.push({
-          v: requirementsCount.toString(),
-          l: 'Active Requirements',
-          color: '#8B5CF6',
-          bg: 'rgba(139, 92, 246, 0.15)',
-        });
-      }
       setStats(fetchedStats);
 
-      // Load filtered donation requests
       if (filter === 'pending') {
         setDonations(dashRes.data?.data?.requests || []);
       } else {
-        const storedStr = await AsyncStorage.getItem('ngo_accepted_donations') || '[]';
-        const activeIds = JSON.parse(storedStr);
-        const list = [];
-        for (const id of activeIds) {
-          try {
-            const { data: res } = await donationsAPI.getTracking(id);
-            if (res.success && res.data?.donationId) {
-              const d = res.data.donationId;
-              if (filter === 'accepted' && ['accepted', 'in_transit', 'delivered', 'verified'].includes(d.status)) {
-                list.push(d);
-              } else if (filter === 'rejected' && d.status === 'cancelled') {
-                list.push(d);
-              }
-            }
-          } catch (err) {
-            console.warn(`Failed to fetch cached donation ${id}:`, err.message);
-          }
-        }
-        setDonations(list);
+        await loadFilteredDonations();
       }
     } catch (e) {
-      console.warn('Failed to load NGO dashboard:', e.message);
+      console.warn('Failed to load NGO dashboard stats:', e.message);
       if (e.response?.status === 401) {
         dispatch(logout());
-      } else {
-        const isNetwork = !e.response || e.message?.includes('Network');
-        setError(isNetwork ? 'Network connection timeout. Please check your connection.' : 'Failed to refresh data from server.');
+        return;
       }
+      const isNetwork = !e.response || e.message?.includes('Network');
+      setError(isNetwork ? 'Network connection timeout. Please check your connection.' : 'Failed to refresh data from server.');
     } finally {
-      setLoading(false); setRefreshing(false);
+      setLoading(false);
+      setRefreshing(false);
     }
+
+    // 3. Load Requirements separately
+    await loadRequirements();
+  };
+
+  const loadRequirements = async () => {
+    setReqsLoading(true);
+    setReqsError(null);
+    try {
+      const reqsRes = await ngosAPI.getRequirements();
+      const list = reqsRes.data?.data || reqsRes.data || [];
+      setRequirements(list);
+
+      // Update Active Requirements count inside stats array
+      setStats(prevStats => {
+        const copy = [...prevStats];
+        const activeCardIdx = copy.findIndex(s => s.l === 'Active Requirements');
+        if (activeCardIdx !== -1) {
+          copy[activeCardIdx].v = list.length.toString();
+        } else if (copy.length >= 3) {
+          copy.push({
+            v: list.length.toString(),
+            l: 'Active Requirements',
+            color: '#8B5CF6',
+            bg: 'rgba(139, 92, 246, 0.15)',
+          });
+        }
+        return copy;
+      });
+    } catch (e) {
+      console.warn('Failed to load NGO requirements:', e.message);
+      setReqsError(e.response?.data?.message || 'Failed to load requirements. Tap to retry.');
+    } finally {
+      setReqsLoading(false);
+    }
+  };
+
+  const loadFilteredDonations = async () => {
+    const storedStr = await AsyncStorage.getItem('ngo_accepted_donations') || '[]';
+    const activeIds = JSON.parse(storedStr);
+    const list = [];
+    for (const id of activeIds) {
+      try {
+        const { data: res } = await donationsAPI.getTracking(id);
+        if (res.success && res.data?.donationId) {
+          const d = res.data.donationId;
+          if (filter === 'accepted' && ['accepted', 'in_transit', 'delivered', 'verified'].includes(d.status)) {
+            list.push(d);
+          } else if (filter === 'rejected' && d.status === 'cancelled') {
+            list.push(d);
+          }
+        }
+      } catch (err) {
+        console.warn(`Failed to fetch cached donation ${id}:`, err.message);
+      }
+    }
+    setDonations(list);
   };
 
   const handleUpdateStatus = async (id, status, noteSuffix = '') => {
@@ -251,7 +289,16 @@ export default function NGODashboardScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {requirements.length === 0 ? (
+        {reqsLoading ? (
+          <ActivityIndicator size="large" color={Colors.primary} style={{ marginVertical: Spacing.md }} />
+        ) : reqsError ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{reqsError}</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={loadRequirements}>
+              <Text style={styles.retryBtnText}>Retry 🔄</Text>
+            </TouchableOpacity>
+          </View>
+        ) : requirements.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.emptyIcon}>📋</Text>
             <Text style={styles.emptyText}>No active requirements yet</Text>
@@ -281,6 +328,7 @@ export default function NGODashboardScreen({ navigation }) {
                   <Text style={styles.detailsText}><Text style={styles.detailsLabel}>Required Date:</Text> {new Date(r.needByDate).toLocaleDateString()}</Text>
                 )}
                 <Text style={styles.detailsText}><Text style={styles.detailsLabel}>Status:</Text> <Text style={styles.statusText}>{r.status || 'open'}</Text></Text>
+                <Text style={styles.detailsText}><Text style={styles.detailsLabel}>Created Date:</Text> {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'N/A'}</Text>
               </View>
             </View>
           ))
@@ -583,4 +631,29 @@ const styles = StyleSheet.create({
   imagePlaceholder: { alignItems: 'center' },
   placeholderText: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm, marginTop: Spacing.sm, fontWeight: '600' },
   proofPreview: { width: '100%', height: '100%' },
+  errorContainer: {
+    padding: Spacing.md,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    marginVertical: Spacing.sm,
+  },
+  errorText: {
+    color: Colors.emergency,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '600',
+    marginBottom: Spacing.xs,
+    textAlign: 'center',
+  },
+  retryBtn: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+  },
+  retryBtnText: {
+    color: '#FFF',
+    fontSize: Typography.fontSize.xs,
+    fontWeight: '700',
+  },
 });

@@ -6,6 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsFocused } from '@react-navigation/native';
 import { ngosAPI } from '../../services/api';
 import { Colors, Typography, Spacing, BorderRadius, Shadows, DonationTypeIcons } from '../../utils/theme';
 
@@ -26,7 +27,13 @@ export default function RequirementManagementScreen({ navigation }) {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ category: 'food', urgency: 'medium', quantity: '', description: '', needByDate: '' });
 
-  useEffect(() => { loadRequests(); }, []);
+  const isFocused = useIsFocused();
+
+  useEffect(() => {
+    if (isFocused) {
+      loadRequests();
+    }
+  }, [isFocused]);
 
   useEffect(() => {
     applyFilter();
